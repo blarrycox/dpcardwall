@@ -241,6 +241,20 @@ input:focus-visible{border-color:var(--accent);outline-offset:1px}
 .slot:active{transform:none}
 
 /* ---- missing rows ---- */
+/* ---- inventory management ---- */
+.slot.addslot{border:1px dashed var(--line-strong);background:none;color:var(--ink-3);font-weight:600}
+@media (hover:hover){.slot.addslot:hover{border-color:var(--accent);color:var(--accent);background:var(--accent-soft)}}
+.addrail{width:100%;min-height:var(--tap);margin-top:var(--sp-2);background:none;
+  border:1px dashed var(--line-strong);border-radius:var(--r);color:var(--ink-2);
+  font:600 var(--t-base) inherit;cursor:pointer;transition:all var(--dur) var(--ease)}
+@media (hover:hover){.addrail:hover{border-color:var(--accent);color:var(--accent);background:var(--accent-soft)}}
+.srow{display:flex;align-items:center;gap:var(--sp-3);margin-top:var(--sp-4)}
+.srow .slbl{flex:1;font-size:var(--t-base);font-weight:600}
+.spv{margin:var(--sp-3) 0 0;font-size:var(--t-base);color:var(--ink-2)}
+.spv b{font-weight:700;color:var(--ink)}
+.sfield{margin-top:var(--sp-4)}
+.serr{margin-top:var(--sp-3);font-size:var(--t-sm);color:var(--gone);min-height:1.2em}
+
 .mrow{display:flex;align-items:center;gap:var(--sp-3);padding:var(--sp-3) 0;border-bottom:1px solid var(--line)}
 .mrow:last-child{border-bottom:0}
 .mrow .mi{font-size:var(--t-md);font-weight:700;color:var(--gone);min-width:66px}
@@ -493,7 +507,7 @@ function gateInit(){
 /* ============================================================
    INVENTORY
    ============================================================ */
-const GROUPS=[
+let GROUPS=[
  {key:'CF', name:'CF', desc:'CFexpress',   pad:0,n:16},
  {key:'TUF',name:'TUF',desc:'Tough SD',    pad:0,n:7},
  {key:'GLD',name:'GLD',desc:'Gold SD',     pad:0,n:10},
@@ -524,8 +538,9 @@ const outAll=()=>Object.keys(CARDS).filter(c=>CARDS[c].batch&&!CARDS[c].missing)
 const natural=(a,b)=>{const na=+a.replace(/\D/g,''),nb=+b.replace(/\D/g,'');
   return a.replace(/[\d-]/g,'').localeCompare(b.replace(/[\d-]/g,''))||na-nb};
 
-const snapshot=()=>({cards:structuredClone(CARDS),batches:structuredClone(BATCHES),seq});
-function restore(s){CARDS=s.cards;BATCHES=s.batches;seq=s.seq;render()}
+const snapshot=()=>({cards:structuredClone(CARDS),batches:structuredClone(BATCHES),
+  groups:structuredClone(GROUPS),seq});
+function restore(s){CARDS=s.cards;BATCHES=s.batches;GROUPS=s.groups;seq=s.seq;render()}
 
 /* SEL is the single source of truth for a checkout. The stepper and the
    card grid are two editors of the same set, never two modes. */
@@ -561,6 +576,53 @@ function unflag(cid){
   const before=snapshot(), c=CARDS[cid]; if(!c)return;
   c.missing=false; c.why=''; c.since='';
   toast(cid+' is back on the wall',before);
+}
+
+/* ============================================================
+   INVENTORY MANAGEMENT
+   New cards get the next free number on their rail. Removal is
+   undoable rather than confirmed, and refuses to touch a card
+   somebody currently has.
+   ============================================================ */
+const cardsIn=k=>Object.keys(CARDS).filter(c=>CARDS[c].group===k).sort(natural);
+const nextNum=k=>cardsIn(k).reduce((m,c)=>Math.max(m,+c.replace(/\D/g,'')),0)+1;
+
+function addCards(k,count){
+  const before=snapshot(), g=GROUPS.find(x=>x.key===k); if(!g||count<1)return;
+  const start=nextNum(k), made=[];
+  for(let i=0;i<count;i++){
+    const cid=id(g,start+i);
+    CARDS[cid]={group:k,batch:null,missing:false,why:'',since:''};
+    made.push(cid);
+  }
+  toast(made.length===1?made[0]+' added to the wall'
+    :made.length+' cards added · '+made[0]+' → '+made[made.length-1],before);
+}
+
+function removeCard(cid){
+  const c=CARDS[cid]; if(!c)return;
+  if(c.batch){ toast(cid+' is checked out — return it first'); return; }
+  const before=snapshot(), k=c.group;
+  delete CARDS[cid]; SEL.delete(cid);
+  if(!cardsIn(k).length){ GROUPS=GROUPS.filter(g=>g.key!==k); OPEN.delete(k); }
+  toast(cid+' removed from the wall',before);
+}
+
+function addRail(code,name,count){
+  const before=snapshot();
+  const k=code.trim().toUpperCase();
+  GROUPS.push({key:k,name:k,desc:name.trim()||'cards',pad:0,n:0});
+  const g=GROUPS[GROUPS.length-1];
+  for(let i=1;i<=count;i++) CARDS[id(g,i)]={group:k,batch:null,missing:false,why:'',since:''};
+  toast(k+' rail created with '+count+' card'+(count>1?'s':''),before);
+}
+
+function railCodeError(code){
+  const k=(code||'').trim().toUpperCase();
+  if(!k) return 'Give the rail a short code.';
+  if(!/^[A-Z][A-Z0-9]{0,4}$/.test(k)) return 'Letters and numbers only, up to 5, starting with a letter.';
+  if(GROUPS.some(g=>g.key===k)) return 'There\'s already a '+k+' rail.';
+  return '';
 }
 
 /* ============================================================
@@ -613,9 +675,11 @@ function renderHome(){
       <div class="grid">${cards.map(c=>{
         const s=CARDS[c].missing?'missing':CARDS[c].batch?'out':'wall';
         const t=CARDS[c].missing?'missing':CARDS[c].batch?'checked out':'on the wall';
-        return `<button class="slot ${s}" onclick="openSheet('${c}')" aria-label="${c}, ${t}">${c}</button>`}).join('')}</div>
+        return `<button class="slot ${s}" onclick="openSheet('${c}')" aria-label="${c}, ${t}">${c}</button>`}).join('')}
+        <button class="slot addslot" onclick="openAddSheet('${g.key}')" aria-label="Add ${g.name} cards">+</button></div>
     </section>`;
-  }).join('');
+  }).join('')
+  + `<button class="addrail" onclick="openRailSheet()">+ Add a new rail</button>`;
 }
 
 function batchHTML(b,btn){
@@ -786,22 +850,95 @@ const sheet=document.getElementById('sheet');
 function openSheet(cid){
   const c=CARDS[cid], b=c.batch?BATCHES.find(x=>x.id===c.batch):null;
   let st,acts;
+  const drop=`<button class="danger" onclick="removeCard('${cid}');closeSheet()">Remove ${cid} from the wall</button>`;
   if(c.missing){
     st=`<b class="gone">Missing.</b> ${esc(c.why)}. Flagged ${fmt(c.since)}.`;
-    acts=`<button class="good" onclick="unflag('${cid}');closeSheet()">Found it, back on the wall</button>`;
+    acts=`<button class="good" onclick="unflag('${cid}');closeSheet()">Found it, back on the wall</button>`+drop;
   }else if(b){
-    st=`<b class="out">Checked out.</b> ${esc(b.project)} — ${esc(b.taker)}, ${fmt(b.date)}.`;
+    st=`<b class="out">Checked out.</b> ${esc(b.project)} — ${esc(b.taker)}, ${fmt(b.date)}. Return it before removing it.`;
     acts=`<button class="good" onclick="oneBack('${cid}')">Back on the wall</button>
           <button class="danger" onclick="flagMissing('${cid}','Never came back from ${esc(b.project)}');closeSheet()">Flag missing</button>`;
   }else{
     st=`<b class="ok">On the wall.</b> Nobody has it checked out.`;
-    acts=`<button class="danger" onclick="flagMissing('${cid}','Not in its slot');closeSheet()">Not in its slot, flag missing</button>`;
+    acts=`<button class="danger" onclick="flagMissing('${cid}','Not in its slot');closeSheet()">Not in its slot, flag missing</button>`+drop;
   }
   document.getElementById('sheetIn').innerHTML=
     `<h2 class="sid" style="margin:0">${cid}</h2><p class="sst">${st}</p>
      <div class="sact">${acts}<button onclick="closeSheet()">Cancel</button></div>`;
   sheet.showModal();
 }
+/* ---- add cards to an existing rail ---- */
+let _sk=null,_sq=1;
+function openAddSheet(k){
+  const g=GROUPS.find(x=>x.key===k); if(!g)return;
+  _sk=k; _sq=1;
+  document.getElementById('sheetIn').innerHTML=`
+    <h2 class="sid">Add to ${g.name}</h2>
+    <p class="sst">${esc(g.desc)} · ${cardsIn(k).length} on this rail now.</p>
+    <div class="srow"><span class="slbl">How many</span>
+      <div class="step" data-on="true">
+        <button onclick="sheetBump(-1)" aria-label="One fewer">−</button>
+        <span class="n" id="sq" aria-live="polite">1</span>
+        <button onclick="sheetBump(1)" aria-label="One more">+</button>
+      </div></div>
+    <p class="spv" id="spv"></p>
+    <div class="sact">
+      <button class="good" id="sgo" onclick="doAdd()"></button>
+      <button onclick="closeSheet()">Cancel</button>
+    </div>`;
+  sheetPreview(); sheet.showModal();
+}
+function sheetBump(d){ _sq=Math.max(1,Math.min(50,_sq+d)); document.getElementById('sq').textContent=_sq; sheetPreview(); }
+function sheetPreview(){
+  const g=GROUPS.find(x=>x.key===_sk), start=nextNum(_sk);
+  const first=id(g,start), last=id(g,start+_sq-1);
+  document.getElementById('spv').innerHTML='Creates <b>'+(_sq===1?first:first+' → '+last)+'</b>';
+  document.getElementById('sgo').textContent='Add '+_sq+' card'+(_sq>1?'s':'');
+}
+function doAdd(){ addCards(_sk,_sq); closeSheet(); }
+
+/* ---- add a whole new rail ---- */
+function openRailSheet(){
+  _sq=1;
+  document.getElementById('sheetIn').innerHTML=`
+    <h2 class="sid">New rail</h2>
+    <p class="sst">For a card type that isn't on the wall yet.</p>
+    <div class="sfield"><label class="lbl" for="rcode">Short code</label>
+      <input type="text" id="rcode" placeholder="SSD" maxlength="5" autocapitalize="characters"
+        autocomplete="off" oninput="railPreview()"></div>
+    <div class="sfield"><label class="lbl" for="rname">What it is</label>
+      <input type="text" id="rname" placeholder="Samsung T7" autocomplete="off" oninput="railPreview()"></div>
+    <div class="srow"><span class="slbl">How many</span>
+      <div class="step" data-on="true">
+        <button onclick="railBump(-1)" aria-label="One fewer">−</button>
+        <span class="n" id="rq" aria-live="polite">1</span>
+        <button onclick="railBump(1)" aria-label="One more">+</button>
+      </div></div>
+    <p class="spv" id="rpv"></p>
+    <p class="serr" id="rerr" aria-live="polite"></p>
+    <div class="sact">
+      <button class="good" id="rgo" onclick="doAddRail()">Create rail</button>
+      <button onclick="closeSheet()">Cancel</button>
+    </div>`;
+  railPreview(); sheet.showModal();
+  document.getElementById('rcode').focus();
+}
+function railBump(d){ _sq=Math.max(1,Math.min(50,_sq+d)); document.getElementById('rq').textContent=_sq; railPreview(); }
+function railPreview(){
+  const code=(document.getElementById('rcode').value||'').trim().toUpperCase();
+  const pv=document.getElementById('rpv'), err=document.getElementById('rerr'), go=document.getElementById('rgo');
+  const bad=railCodeError(code);
+  err.textContent = code ? bad : '';
+  go.disabled=!!bad;
+  pv.innerHTML = (!code||bad) ? 'Creates <b>—</b>'
+    : 'Creates <b>'+(_sq===1?code+'-1':code+'-1 → '+code+'-'+_sq)+'</b>';
+}
+function doAddRail(){
+  const code=document.getElementById('rcode').value, name=document.getElementById('rname').value;
+  if(railCodeError(code))return;
+  addRail(code,name,_sq); closeSheet();
+}
+
 function closeSheet(){sheet.close();render()}
 sheet.addEventListener('click',e=>{if(e.target===sheet)closeSheet()});
 function oneBack(cid){

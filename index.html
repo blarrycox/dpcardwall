@@ -275,6 +275,9 @@ input:focus-visible{border-color:var(--accent);outline-offset:1px}
 .shoots{display:flex;gap:var(--sp-2);overflow-x:auto;padding:var(--sp-1) 0 var(--sp-2);
   margin-top:var(--sp-4);scrollbar-width:none}
 .shoots::-webkit-scrollbar{display:none}
+.shootwrap{position:relative}
+.shootwrap::after{content:'';position:absolute;top:0;right:0;bottom:var(--sp-2);width:36px;
+  pointer-events:none;background:linear-gradient(90deg,transparent,var(--bg))}
 .sh{flex:0 0 auto;min-height:var(--tap);background:var(--surface);border:1px solid var(--line);
   color:var(--ink-2);border-radius:var(--r);padding:var(--sp-2) var(--sp-3);cursor:pointer;
   font:inherit;text-align:left;transition:all var(--dur) var(--ease)}
@@ -555,8 +558,8 @@ dialog.sheet[open]::backdrop{animation:fade 240ms var(--ease)}
   <section id="v-ingest" class="hide">
     <h1 id="ingTitle">Ingest</h1>
     <p class="lede" id="ingLede"></p>
-    <button class="newshoot" onclick="openShootSheet()">+ New shoot day</button>
-    <div class="shoots" id="shoots"></div>
+    <button class="newshoot" id="newShootBtn" onclick="openShootSheet()">+ New shoot day</button>
+    <div class="shootwrap"><div class="shoots" id="shoots"></div></div>
     <div id="ingBody"></div>
   </section>
 
@@ -1049,7 +1052,8 @@ function batchHTML(b,btn){
     <div class="btop">
       <div><div class="pj">${esc(b.project)}</div><div class="sb">${esc(b.taker)} · ${fmt(b.date)}${
         (()=>{const cams=[...new Set(b.cards.map(c=>CARDS[c]&&CARDS[c].cam).filter(Boolean))];
-              return cams.length?' · '+cams.join(', '):'';})()}</div></div>
+              if(!cams.length) return '';
+              return ' · '+cams.slice(0,3).join(', ')+(cams.length>3?' +'+(cams.length-3)+' more cameras':'');})()}</div></div>
       <div class="pill">${b.cards.length} out</div>
     </div>
     <div class="ids">${chipsFor(b.cards)}</div>
@@ -1349,10 +1353,11 @@ const entriesFor=id=>Object.values(ENTRIES).filter(e=>e.shoot===id)
 const camList=()=>[...new Set(Object.values(CARDS).map(c=>c.cam).filter(Boolean))].sort();
 
 function shootStats(sid){
-  const rows=entriesFor(sid);
-  return {rows,total:rows.length,
+  const rows=entriesFor(sid), sh=SHOOTS[sid];
+  const future = sh && sh.date && sh.date > today();   // day hasn't happened yet
+  return {rows,total:rows.length,future,
     verified:rows.filter(e=>e.status==='VERIFIED').length,
-    risk:rows.filter(e=>AT_RISK.includes(e.status)).length};
+    risk:future?0:rows.filter(e=>AT_RISK.includes(e.status)).length};
 }
 const recentProjects=()=>[...new Set(BATCHES.map(b=>b.project).filter(Boolean))].slice(0,8);
 
@@ -1390,6 +1395,7 @@ function renderIngest(){
 /* ---------- level 1: projects ---------- */
 function renderProjects(){
   const list=projList(), risk=list.reduce((n,p)=>n+p.risk,0);
+  document.getElementById('newShootBtn').style.display='';
   document.getElementById('shoots').innerHTML='';
   document.getElementById('ingTitle').textContent='Ingest';
   document.getElementById('ingLede').textContent = list.length
@@ -1427,6 +1433,7 @@ function backToProjects(){ PROJ=null; CUR=null; renderIngest(); window.scrollTo(
 /* ---------- level 2: shoot days in one project ---------- */
 function renderDays(){
   const days=daysOf(PROJ), risk=days.reduce((n,sh)=>n+shootStats(sh.id).risk,0);
+  document.getElementById('newShootBtn').style.display='';
   document.getElementById('shoots').innerHTML='';
   document.getElementById('ingTitle').textContent=PROJ;
   document.getElementById('ingLede').textContent=
@@ -1440,7 +1447,7 @@ function renderDays(){
         const tone=st.risk?'p-risk':ok?'p-safe':'p-idle';
         return `<div class="pcard ${st.risk?'danger':''}">
           <div class="phead"><span class="pn">${esc(sh.day||'Shoot day')}</span>
-            <span class="pm">${fmt(sh.date)}</span></div>
+            <span class="pm">${fmt(sh.date)}${st.future?' · upcoming':''}</span></div>
           <div class="pstats">
             <div><span>Rows</span><b>${st.total}</b></div>
             <div><span>Verified</span><b>${st.verified}</b></div>
@@ -1457,6 +1464,7 @@ function renderDays(){
 /* ---------- level 3: one shoot day ---------- */
 function renderShoot(){
   const sh=SHOOTS[CUR], days=daysOf(sh.project);
+  document.getElementById('newShootBtn').style.display='none';
   document.getElementById('shoots').innerHTML = days.length>1
     ? days.map(d=>`<button class="sh" aria-pressed="${d.id===CUR}" onclick="pickShoot('${d.id}')">
         <span class="p">${esc(d.day||'Shoot day')}</span>
@@ -1511,7 +1519,7 @@ function ingRow(e){
   return `<div class="erow">
     <button class="ename" onclick="openEntrySheet('${e.id}')">
       <span class="n">${esc(e.label)}</span>
-      <span class="m">${e.card?`<span class="cid">${esc(e.card)}</span>`:''}${
+      <span class="m">${e.card&&e.card!==e.label?`<span class="cid">${esc(e.card)}</span>`:''}${
         e.cam&&e.cam!==e.label?`<span class="camchip">${esc(e.cam)}</span>`:''}${esc(st.note)}</span>
     </button>
     <button class="st p-${st.tone}" onclick="openStageSheet('${e.id}')">${esc(st.label)}</button></div>`;

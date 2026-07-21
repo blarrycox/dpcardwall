@@ -1,0 +1,710 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#f7f8f9">
+<title>Card Wall</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* ============================================================
+   TOKENS
+   Register: product. Scene — a camera op standing at the rail
+   in a bright bay, phone in one hand, cards in the other,
+   wanting to be done in fifteen seconds. Bright room ⇒ light UI.
+   Colour strategy: restrained. One accent, three status hues,
+   everything else neutral.
+   ============================================================ */
+:root{
+  /* surfaces — chroma near zero, deliberately not warm/cream */
+  --bg:          oklch(97.5% 0.002 250);
+  --surface:     oklch(100%  0     0);
+  --surface-2:   oklch(95%   0.003 250);
+  --line:        oklch(89%   0.005 250);
+  --line-strong: oklch(80%   0.008 250);
+
+  /* ink ramp — all verified ≥4.5:1 on --bg */
+  --ink:   oklch(22% 0.012 250);
+  --ink-2: oklch(42% 0.014 250);
+  --ink-3: oklch(47% 0.014 250);
+
+  /* accent: primary action, selection, focus. Nothing decorative. */
+  --accent:       oklch(50% 0.19 258);
+  --accent-hover: oklch(44% 0.19 258);
+  --accent-soft:  oklch(95% 0.03 258);
+
+  /* status: on wall / checked out / unaccounted for */
+  --ok:     oklch(45%   0.12  155); --ok-bg:   oklch(95.5% 0.035 155); --ok-line:   oklch(85% 0.06 155);
+  --out:    oklch(46%   0.11  70);  --out-bg:  oklch(95.5% 0.045 75);  --out-line:  oklch(85% 0.08 75);
+  --gone:   oklch(48%   0.17  25);  --gone-bg: oklch(95.5% 0.03  25);  --gone-line: oklch(86% 0.07 25);
+
+  /* spacing scale — every gap comes from here */
+  --sp-1:4px; --sp-2:8px; --sp-3:12px; --sp-4:16px; --sp-5:24px; --sp-6:32px; --sp-7:48px;
+
+  /* type scale — product ratio ~1.15, fixed px, one family */
+  --t-xs:12px; --t-sm:13px; --t-base:15px; --t-md:17px; --t-lg:20px; --t-xl:24px; --t-2xl:28px;
+
+  /* semantic z-index */
+  --z-sticky:100; --z-toast:400;
+
+  --r-sm:6px; --r:10px; --r-lg:14px;
+  --ease:cubic-bezier(.22,1,.36,1);           /* ease-out-quint */
+  --dur:180ms;
+  --tap:44px;                                  /* minimum touch target */
+}
+
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;padding:0}
+body{
+  background:var(--bg); color:var(--ink);
+  font:400 var(--t-base)/1.55 'IBM Plex Sans',system-ui,sans-serif;
+  font-feature-settings:'tnum' 1; -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:600px;margin:0 auto;padding:0 var(--sp-4) 120px}
+
+/* ---- focus: one ring, every interactive element ---- */
+:where(button,input,[tabindex]):focus{outline:none}
+:where(button,input,[tabindex]):focus-visible{
+  outline:2px solid var(--accent); outline-offset:2px; border-radius:var(--r-sm);
+}
+
+/* ---- type ---- */
+h1{font-size:var(--t-xl);font-weight:700;letter-spacing:-.35px;line-height:1.2;
+   margin:var(--sp-5) 0 var(--sp-1);text-wrap:balance}
+h2{font-size:var(--t-md);font-weight:600;letter-spacing:-.15px;line-height:1.3;
+   margin:var(--sp-6) 0 var(--sp-3);text-wrap:balance;display:flex;align-items:baseline;gap:var(--sp-2)}
+h2 .c{font-size:var(--t-sm);font-weight:400;color:var(--ink-3)}
+h2 .c.bad{color:var(--gone);font-weight:600}
+.lede{font-size:var(--t-base);color:var(--ink-2);margin:0;max-width:68ch;text-wrap:pretty}
+
+header{position:sticky;top:0;z-index:var(--z-sticky);background:color-mix(in oklab,var(--bg) 88%,transparent);
+  backdrop-filter:blur(12px);border-bottom:1px solid var(--line);padding:var(--sp-3) var(--sp-4)}
+.hrow{max-width:600px;margin:0 auto;display:flex;align-items:baseline;gap:var(--sp-3)}
+.mark{font-size:var(--t-md);font-weight:700;letter-spacing:-.3px}
+.who{margin-left:auto;font-size:var(--t-sm);color:var(--ink-3)}
+
+/* ---- primary/secondary actions ---- */
+.acts{display:grid;gap:var(--sp-2);margin-top:var(--sp-4)}
+.act{display:flex;align-items:center;gap:var(--sp-3);width:100%;min-height:var(--tap);
+  text-align:left;cursor:pointer;font:inherit;color:var(--ink);
+  background:var(--surface);border:1px solid var(--line);border-radius:var(--r);
+  padding:var(--sp-4);transition:background var(--dur) var(--ease),border-color var(--dur) var(--ease)}
+.act>span:first-child{display:block;min-width:0}
+.act .t{display:block;font-size:var(--t-md);font-weight:600;letter-spacing:-.15px}
+.act .d{display:block;font-size:var(--t-sm);color:var(--ink-3);margin-top:1px}
+.act .arw{margin-left:auto;color:var(--ink-3);transition:transform var(--dur) var(--ease)}
+.act.pri{background:var(--accent);border-color:var(--accent);color:#fff}
+.act.pri .d{color:color-mix(in oklab,#fff 78%,var(--accent))}
+.act.pri .arw{color:color-mix(in oklab,#fff 78%,var(--accent))}
+@media (hover:hover){
+  .act:hover{border-color:var(--line-strong);background:var(--surface-2)}
+  .act:hover .arw{transform:translateX(2px)}
+  .act.pri:hover{background:var(--accent-hover);border-color:var(--accent-hover)}
+}
+.act:active{transform:translateY(1px)}
+
+/* ---- stats ---- */
+.stats{display:grid;grid-template-columns:repeat(4,1fr);margin-top:var(--sp-5);
+  border:1px solid var(--line);border-radius:var(--r);background:var(--surface);overflow:hidden}
+.stat{padding:var(--sp-3) var(--sp-2);text-align:center;border-right:1px solid var(--line)}
+.stat:last-child{border-right:0}
+.stat b{display:block;font-size:var(--t-2xl);font-weight:700;letter-spacing:-.8px;line-height:1}
+.stat span{display:block;font-size:var(--t-xs);color:var(--ink-3);margin-top:var(--sp-1)}
+.stat.o b{color:var(--out)} .stat.g b{color:var(--gone)}
+button.stat{font:inherit;cursor:pointer;background:var(--surface);border-top:0;border-bottom:0;border-left:0;
+  transition:background var(--dur) var(--ease)}
+@media (hover:hover){button.stat:hover{background:var(--gone-bg)}}
+
+/* ---- lists / panels (dividers over nested cards) ---- */
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:var(--sp-4)}
+.list{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:0 var(--sp-4)}
+
+/* ---- form ---- */
+.lbl{display:block;font-size:var(--t-sm);font-weight:600;color:var(--ink-2);margin-bottom:var(--sp-2)}
+input[type=text],input[type=date]{width:100%;min-height:var(--tap);background:var(--surface);
+  border:1px solid var(--line-strong);color:var(--ink);border-radius:var(--r-sm);
+  padding:var(--sp-3);font:400 16px/1.4 'IBM Plex Sans',system-ui,sans-serif;
+  transition:border-color var(--dur) var(--ease)}
+input::placeholder{color:var(--ink-3)}
+input:focus-visible{border-color:var(--accent);outline-offset:1px}
+.chips{display:flex;flex-wrap:wrap;gap:var(--sp-2);margin-top:var(--sp-3)}
+.chip{min-height:36px;background:var(--surface-2);border:1px solid var(--line);color:var(--ink-2);
+  padding:var(--sp-2) var(--sp-3);border-radius:var(--r-sm);font:500 var(--t-sm) inherit;cursor:pointer;
+  transition:all var(--dur) var(--ease)}
+@media (hover:hover){.chip:hover{border-color:var(--accent);color:var(--accent);background:var(--accent-soft)}}
+.chip[aria-pressed=true]{background:var(--accent-soft);border-color:var(--accent);color:var(--accent);font-weight:600}
+
+/* ---- quantity rows ---- */
+.qrow{display:flex;align-items:center;gap:var(--sp-3);padding:var(--sp-3) 0;border-bottom:1px solid var(--line)}
+.qrow:last-child{border-bottom:0}
+.qrow .m{flex:1;min-width:0}
+.qrow .nm{font-size:var(--t-md);font-weight:600;letter-spacing:-.15px}
+.qrow .nm i{font-style:normal;font-size:var(--t-sm);font-weight:400;color:var(--ink-3);margin-left:var(--sp-2)}
+.qrow .av{font-size:var(--t-sm);color:var(--ink-3);margin-top:1px}
+.qrow .av.low{color:var(--out)} .qrow .av.none{color:var(--gone)}
+.qrow .av em{font-style:normal;color:var(--gone)}
+.step{display:flex;align-items:center;border:1px solid var(--line-strong);border-radius:var(--r-sm);
+  overflow:hidden;flex-shrink:0;background:var(--surface)}
+.step button{width:var(--tap);height:var(--tap);background:none;border:0;color:var(--ink);
+  font:500 20px/1 inherit;cursor:pointer;transition:background var(--dur) var(--ease)}
+@media (hover:hover){.step button:hover:not(:disabled){background:var(--surface-2)}}
+.step button:active:not(:disabled){background:var(--line)}
+.step button:disabled{color:var(--line-strong);cursor:not-allowed}
+.step .n{width:36px;text-align:center;font-size:var(--t-md);font-weight:600}
+.step[data-on=true]{border-color:var(--accent)}
+.step[data-on=true] .n{color:var(--accent)}
+
+/* ---- card ids ---- */
+.ids{display:flex;flex-wrap:wrap;gap:var(--sp-2)}
+.cid{font-size:var(--t-sm);font-weight:600;background:var(--surface-2);border:1px solid var(--line);
+  color:var(--ink);padding:var(--sp-1) var(--sp-2);border-radius:var(--r-sm)}
+.rng{font-size:var(--t-lg);font-weight:700;letter-spacing:-.4px;color:var(--ink)}
+.rng.xl{font-size:var(--t-2xl);letter-spacing:-.8px}
+.agrp{padding:var(--sp-3) 0;border-bottom:1px solid var(--line)}
+.agrp:first-child{padding-top:0} .agrp:last-child{padding-bottom:0;border-bottom:0}
+.agrp .lab{font-size:var(--t-sm);color:var(--ink-3);margin-bottom:var(--sp-2)}
+
+/* ---- batches ---- */
+.batch{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);
+  padding:var(--sp-4);margin-bottom:var(--sp-2)}
+.btop{display:flex;align-items:flex-start;gap:var(--sp-3);margin-bottom:var(--sp-3)}
+.btop .pj{font-size:var(--t-md);font-weight:600;letter-spacing:-.15px}
+.btop .sb{font-size:var(--t-sm);color:var(--ink-3);margin-top:1px}
+.pill{margin-left:auto;background:var(--out-bg);border:1px solid var(--out-line);color:var(--out);
+  padding:var(--sp-1) var(--sp-2);border-radius:var(--r-sm);font-size:var(--t-sm);font-weight:600;white-space:nowrap}
+.brow{display:flex;gap:var(--sp-2);margin-top:var(--sp-4)}
+.btn2{flex:1;min-height:var(--tap);background:var(--surface);border:1px solid var(--line-strong);
+  color:var(--ink);border-radius:var(--r-sm);padding:var(--sp-3);font:600 var(--t-base) inherit;cursor:pointer;
+  transition:all var(--dur) var(--ease)}
+@media (hover:hover){.btn2:hover{background:var(--surface-2);border-color:var(--ink-3)}}
+.btn2:active{background:var(--line)}
+.btn2.sec{flex:0 0 auto;padding:var(--sp-3) var(--sp-4);color:var(--ink-2);font-weight:500}
+
+/* ---- triage picks ---- */
+.pick{min-height:var(--tap);font-size:var(--t-md);font-weight:600;background:var(--surface);
+  border:1px solid var(--line-strong);color:var(--ink);padding:var(--sp-2) var(--sp-3);
+  border-radius:var(--r-sm);cursor:pointer;transition:all var(--dur) var(--ease)}
+@media (hover:hover){.pick:hover{border-color:var(--gone)}}
+.pick[aria-pressed=true]{background:var(--gone-bg);border-color:var(--gone);color:var(--gone)}
+.pick[aria-pressed=true]::after{content:' ✕';font-size:var(--t-sm)}
+
+/* ---- wall grid ---- */
+.gsec{margin-bottom:var(--sp-5)}
+.gh{display:flex;align-items:baseline;gap:var(--sp-2);margin-bottom:var(--sp-2)}
+.gh b{font-size:var(--t-md);font-weight:600;letter-spacing:-.15px}
+.gh span{font-size:var(--t-sm);color:var(--ink-3)}
+.gh em{font-style:normal;color:var(--gone);font-weight:600}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(68px,1fr));gap:var(--sp-2)}
+.slot{min-height:var(--tap);border:1px solid var(--line);background:var(--surface);border-radius:var(--r-sm);
+  padding:var(--sp-2) var(--sp-1);font:600 var(--t-sm) inherit;color:var(--ink-3);cursor:pointer;
+  transition:all var(--dur) var(--ease)}
+.slot.wall{background:var(--ok-bg);border-color:var(--ok-line);color:var(--ok)}
+.slot.out{background:var(--out-bg);border-color:var(--out-line);color:var(--out)}
+.slot.missing{background:var(--gone-bg);border-color:var(--gone-line);color:var(--gone)}
+@media (hover:hover){.slot:hover{border-color:var(--ink-3);transform:translateY(-1px)}}
+.slot:active{transform:none}
+
+/* ---- missing rows ---- */
+.mrow{display:flex;align-items:center;gap:var(--sp-3);padding:var(--sp-3) 0;border-bottom:1px solid var(--line)}
+.mrow:last-child{border-bottom:0}
+.mrow .mi{font-size:var(--t-md);font-weight:700;color:var(--gone);min-width:66px}
+.mrow .mm{flex:1;min-width:0;font-size:var(--t-sm);color:var(--ink-2)}
+.mrow .mm s{display:block;text-decoration:none;color:var(--ink-3);font-size:var(--t-xs);margin-top:1px}
+.mrow button{min-height:var(--tap);background:var(--surface);border:1px solid var(--line-strong);
+  color:var(--ink);border-radius:var(--r-sm);padding:var(--sp-2) var(--sp-3);
+  font:600 var(--t-sm) inherit;cursor:pointer;white-space:nowrap;transition:all var(--dur) var(--ease)}
+@media (hover:hover){.mrow button:hover{background:var(--ok-bg);border-color:var(--ok-line);color:var(--ok)}}
+
+/* ---- action bar ---- */
+.bar{position:fixed;left:0;right:0;bottom:0;z-index:var(--z-sticky);background:var(--bg);
+  border-top:1px solid var(--line);padding:var(--sp-3) var(--sp-4) calc(var(--sp-4) + env(safe-area-inset-bottom))}
+.bar .in{max-width:600px;margin:0 auto;display:flex;gap:var(--sp-2)}
+.go{flex:1;min-height:52px;background:var(--accent);color:#fff;border:1px solid var(--accent);
+  border-radius:var(--r);padding:var(--sp-3);font:600 var(--t-md) inherit;letter-spacing:-.15px;cursor:pointer;
+  transition:background var(--dur) var(--ease)}
+.go.warn{background:var(--gone);border-color:var(--gone)}
+.go:disabled{background:var(--surface-2);border-color:var(--line);color:var(--ink-3);cursor:not-allowed}
+@media (hover:hover){.go:hover:not(:disabled){background:var(--accent-hover)}
+  .go.warn:hover:not(:disabled){filter:brightness(.92)}}
+.go:active:not(:disabled){transform:translateY(1px)}
+
+/* ---- sheet: native dialog, top layer, focus-trapped, Esc-dismissable ---- */
+dialog.sheet{border:0;padding:0;background:transparent;max-width:600px;width:100%;
+  margin:auto auto 0;max-height:90dvh}
+dialog.sheet::backdrop{background:oklch(22% 0.012 250 / .42);backdrop-filter:blur(2px)}
+dialog.sheet .in{background:var(--surface);border-top:1px solid var(--line);
+  border-radius:var(--r-lg) var(--r-lg) 0 0;padding:var(--sp-5) var(--sp-4) calc(var(--sp-5) + env(safe-area-inset-bottom))}
+dialog.sheet[open]{animation:rise 240ms var(--ease)}
+dialog.sheet[open]::backdrop{animation:fade 240ms var(--ease)}
+@keyframes rise{from{transform:translateY(24px);opacity:0}to{transform:none;opacity:1}}
+@keyframes fade{from{opacity:0}to{opacity:1}}
+.sid{font-size:var(--t-2xl);font-weight:700;letter-spacing:-.8px;line-height:1}
+.sst{font-size:var(--t-base);color:var(--ink-2);margin-top:var(--sp-2);line-height:1.6;max-width:60ch}
+.sst b{font-weight:600}
+.sst b.ok{color:var(--ok)} .sst b.out{color:var(--out)} .sst b.gone{color:var(--gone)}
+.sact{display:grid;gap:var(--sp-2);margin-top:var(--sp-5)}
+.sact button{width:100%;min-height:var(--tap);border-radius:var(--r-sm);padding:var(--sp-3);
+  font:600 var(--t-base) inherit;cursor:pointer;border:1px solid var(--line-strong);
+  background:var(--surface);color:var(--ink);transition:all var(--dur) var(--ease)}
+@media (hover:hover){.sact button:hover{background:var(--surface-2)}}
+.sact button.danger{background:var(--gone-bg);border-color:var(--gone-line);color:var(--gone)}
+.sact button.good{background:var(--ok-bg);border-color:var(--ok-line);color:var(--ok)}
+
+/* ---- toast with undo (undo beats confirm dialogs) ---- */
+.toast{position:fixed;left:var(--sp-4);right:var(--sp-4);bottom:88px;z-index:var(--z-toast);
+  max-width:568px;margin:0 auto;background:var(--ink);color:var(--bg);
+  padding:var(--sp-3) var(--sp-3) var(--sp-3) var(--sp-4);border-radius:var(--r);
+  font-size:var(--t-base);font-weight:500;display:flex;align-items:center;gap:var(--sp-3);
+  opacity:0;transform:translateY(8px);transition:opacity var(--dur) var(--ease),transform var(--dur) var(--ease);
+  pointer-events:none}
+.toast.show{opacity:1;transform:none;pointer-events:auto}
+.toast button{margin-left:auto;min-height:36px;background:none;border:1px solid color-mix(in oklab,var(--bg) 40%,transparent);
+  color:var(--bg);border-radius:var(--r-sm);padding:var(--sp-1) var(--sp-3);font:600 var(--t-sm) inherit;cursor:pointer}
+@media (hover:hover){.toast button:hover{background:color-mix(in oklab,var(--bg) 15%,transparent)}}
+
+/* ---- empty states teach the interface ---- */
+.empty{border:1px dashed var(--line-strong);border-radius:var(--r);padding:var(--sp-5) var(--sp-4);
+  color:var(--ink-2);font-size:var(--t-base);max-width:60ch;text-wrap:pretty}
+.empty b{display:block;font-weight:600;color:var(--ink);margin-bottom:var(--sp-1)}
+
+.back{background:none;border:0;color:var(--accent);font:600 var(--t-base) inherit;cursor:pointer;
+  padding:var(--sp-4) var(--sp-2) 0;margin-left:calc(var(--sp-2) * -1);min-height:var(--tap)}
+.hide{display:none}
+.note{font-size:var(--t-sm);color:var(--ink-3);margin:var(--sp-3) 0 0;line-height:1.6;max-width:68ch;text-wrap:pretty}
+.sr{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:1ms !important;animation-iteration-count:1 !important;
+    transition-duration:1ms !important;scroll-behavior:auto !important}
+  .act:hover .arw,.slot:hover{transform:none}
+}
+</style>
+</head>
+<body>
+
+<header><div class="hrow">
+  <span class="mark">Card Wall</span>
+  <span class="who" id="who"></span>
+</div></header>
+
+<main class="wrap" id="main">
+
+  <!-- HOME -->
+  <section id="v-home">
+    <h1>The wall</h1>
+    <p class="lede" id="lede"></p>
+
+    <div class="acts">
+      <button class="act pri" onclick="go('take')">
+        <span><span class="t">Take cards</span><span class="d">Check out a batch</span></span>
+        <span class="arw" aria-hidden="true">→</span>
+      </button>
+      <button class="act" onclick="go('return')">
+        <span><span class="t">Return cards</span><span class="d" id="retSub"></span></span>
+        <span class="arw" aria-hidden="true">→</span>
+      </button>
+    </div>
+
+    <div class="stats">
+      <div class="stat"><b id="sWall">0</b><span>On wall</span></div>
+      <div class="stat o"><b id="sOut">0</b><span>Out</span></div>
+      <button class="stat g" onclick="jump('missSec')"><b id="sMiss">0</b><span>Missing</span></button>
+      <div class="stat"><b id="sBatch">0</b><span>Batches</span></div>
+    </div>
+
+    <div id="missSec"></div>
+
+    <h2>Checked out</h2>
+    <div id="outList"></div>
+
+    <h2>Every slot<span class="c">Tap a card to change its status</span></h2>
+    <div id="wallGrid"></div>
+  </section>
+
+  <!-- TAKE -->
+  <section id="v-take" class="hide">
+    <button class="back" onclick="go('home')">← The wall</button>
+    <h1>Take cards</h1>
+
+    <h2>Project</h2>
+    <div class="panel">
+      <label class="lbl" for="pj">Project name</label>
+      <input type="text" id="pj" placeholder="SAVBAN ASG" autocomplete="off" autocapitalize="characters">
+      <div class="chips" id="pjChips"></div>
+    </div>
+
+    <h2>How many</h2>
+    <div class="list" id="qtyBox"></div>
+
+    <div id="preview" aria-live="polite"></div>
+
+    <h2>Details</h2>
+    <div class="panel">
+      <label class="lbl" for="taker">Taker</label>
+      <input type="text" id="taker">
+      <label class="lbl" for="dt" style="margin-top:var(--sp-4)">Date</label>
+      <input type="date" id="dt">
+      <p class="note">Already filled in. Change these only if you're grabbing cards for someone else.</p>
+    </div>
+  </section>
+
+  <!-- DONE -->
+  <section id="v-done" class="hide">
+    <h1>Grab these</h1>
+    <p class="lede" id="doneSub"></p>
+    <div class="panel" style="margin-top:var(--sp-4)" id="doneIds"></div>
+  </section>
+
+  <!-- RETURN -->
+  <section id="v-return" class="hide">
+    <button class="back" onclick="go('home')">← The wall</button>
+    <h1>Return cards</h1>
+    <p class="lede">Put a whole batch back, or flag what didn't come home.</p>
+    <div style="margin-top:var(--sp-5)" id="retList"></div>
+  </section>
+
+  <!-- TRIAGE -->
+  <section id="v-triage" class="hide">
+    <button class="back" onclick="go('return')">← Back</button>
+    <h1>What's missing?</h1>
+    <p class="lede">Tap the cards that didn't come back. Everything else goes on the wall.</p>
+    <div class="panel" style="margin-top:var(--sp-5)" id="triageBox"></div>
+  </section>
+
+</main>
+
+<div class="bar hide" id="bar"><div class="in" id="barIn"></div></div>
+
+<dialog class="sheet" id="sheet"><div class="in" id="sheetIn"></div></dialog>
+
+<div class="toast" id="toast" role="status" aria-live="polite">
+  <span id="toastMsg"></span><button id="toastUndo" class="hide" onclick="undo()">Undo</button>
+</div>
+
+<script>
+/* ============================================================
+   INVENTORY
+   ============================================================ */
+const GROUPS=[
+ {key:'CF', name:'CF', desc:'CFexpress',   pad:0,n:16},
+ {key:'TUF',name:'TUF',desc:'Tough SD',    pad:0,n:7},
+ {key:'GLD',name:'GLD',desc:'Gold SD',     pad:0,n:10},
+ {key:'DPO',name:'DPO',desc:'Pocket/Osmo', pad:0,n:8},
+ {key:'L',  name:'L',  desc:'micro',       pad:2,n:25},
+ {key:'P',  name:'P',  desc:'micro',       pad:0,n:15},
+ {key:'R',  name:'R',  desc:'micro',       pad:0,n:7},
+ {key:'D',  name:'D',  desc:'micro',       pad:0,n:10},
+];
+const id=(g,i)=>g.key+'-'+(g.pad?String(i).padStart(g.pad,'0'):i);
+
+/* ============================================================
+   STATE — in-memory prototype. A real build swaps this layer
+   for a database; every read/write already funnels through
+   the helpers below.
+   ============================================================ */
+const ME='Blaise Larry-Cox';
+const RECENT=['SAVBAN ASG','Bananas ASG','Overtime','Squad Games','Can We Score'];
+
+let CARDS={};
+GROUPS.forEach(g=>{for(let i=1;i<=g.n;i++)CARDS[id(g,i)]={group:g.key,batch:null,missing:false,why:'',since:''}});
+let BATCHES=[], seq=1, draft={}, triageId=null, triagePick=new Set(), lastUndo=null;
+
+const avail=k=>Object.keys(CARDS).filter(c=>CARDS[c].group===k&&!CARDS[c].batch&&!CARDS[c].missing);
+const missingIn=k=>Object.keys(CARDS).filter(c=>CARDS[c].group===k&&CARDS[c].missing);
+const allMissing=()=>Object.keys(CARDS).filter(c=>CARDS[c].missing).sort(natural);
+const outAll=()=>Object.keys(CARDS).filter(c=>CARDS[c].batch&&!CARDS[c].missing);
+const natural=(a,b)=>{const na=+a.replace(/\D/g,''),nb=+b.replace(/\D/g,'');
+  return a.replace(/[\d-]/g,'').localeCompare(b.replace(/[\d-]/g,''))||na-nb};
+
+const snapshot=()=>({cards:structuredClone(CARDS),batches:structuredClone(BATCHES),seq});
+function restore(s){CARDS=s.cards;BATCHES=s.batches;seq=s.seq;render()}
+
+function assign(){
+  const out=[];
+  GROUPS.forEach(g=>{
+    const want=draft[g.key]||0; if(!want)return;
+    const got=avail(g.key).sort(natural).slice(0,want);
+    if(got.length)out.push({g,cards:got});
+  });
+  return out;
+}
+const totalWanted=()=>Object.values(draft).reduce((a,b)=>a+b,0);
+function asRange(cards){
+  if(cards.length<3)return null;
+  const n=cards.map(c=>+c.replace(/\D/g,''));
+  for(let i=1;i<n.length;i++)if(n[i]!==n[i-1]+1)return null;
+  return cards[0]+' → '+cards[cards.length-1];
+}
+
+/* ---------- mutations ---------- */
+function flagMissing(cid,why){
+  const before=snapshot(), c=CARDS[cid]; if(!c)return;
+  c.missing=true; c.why=why||'Not in its slot'; c.since=today();
+  if(c.batch){
+    const b=BATCHES.find(x=>x.id===c.batch);
+    if(b){b.cards=b.cards.filter(x=>x!==cid); if(!b.cards.length)BATCHES=BATCHES.filter(x=>x.id!==b.id)}
+    c.batch=null;
+  }
+  toast(cid+' flagged missing',before);
+}
+function unflag(cid){
+  const before=snapshot(), c=CARDS[cid]; if(!c)return;
+  c.missing=false; c.why=''; c.since='';
+  toast(cid+' is back on the wall',before);
+}
+
+/* ============================================================
+   ROUTING
+   ============================================================ */
+let view='home';
+const VIEWS=['home','take','done','return','triage'];
+function go(v){
+  view=v;
+  VIEWS.forEach(x=>document.getElementById('v-'+x).classList.toggle('hide',x!==v));
+  window.scrollTo(0,0); render();
+}
+function jump(e){document.getElementById(e).scrollIntoView({behavior:'smooth',block:'start'})}
+
+function render(){
+  document.getElementById('who').textContent=ME.split(' ')[0]+' · '+fmt(today());
+  ({home:renderHome,take:renderTake,return:renderReturn,triage:renderTriage}[view]||(()=>{}))();
+  renderBar();
+}
+
+function renderHome(){
+  const out=outAll().length, miss=allMissing().length, tot=Object.keys(CARDS).length;
+  document.getElementById('sWall').textContent=tot-out-miss;
+  document.getElementById('sOut').textContent=out;
+  document.getElementById('sMiss').textContent=miss;
+  document.getElementById('sBatch').textContent=BATCHES.length;
+  document.getElementById('retSub').textContent=out?out+' cards out right now':'Nothing is out';
+  document.getElementById('lede').textContent=
+    tot+' cards across '+GROUPS.length+' rails'+(miss?' · '+miss+' unaccounted for':'');
+
+  document.getElementById('missSec').innerHTML=miss?`
+    <h2>Unaccounted for<span class="c bad">${miss}</span></h2>
+    <div class="list">${allMissing().map(c=>`
+      <div class="mrow">
+        <span class="mi">${c}</span>
+        <span class="mm">${esc(CARDS[c].why)}<s>Flagged ${fmt(CARDS[c].since)}</s></span>
+        <button onclick="unflag('${c}')">Found it</button>
+      </div>`).join('')}</div>`:'';
+
+  document.getElementById('outList').innerHTML=BATCHES.length
+    ?BATCHES.map(b=>batchHTML(b,false)).join('')
+    :`<p class="empty"><b>Nothing is checked out.</b>Take a batch and it'll show up here with who has it and which project it's on.</p>`;
+
+  document.getElementById('wallGrid').innerHTML=GROUPS.map(g=>{
+    const cards=Object.keys(CARDS).filter(c=>CARDS[c].group===g.key).sort(natural);
+    const free=cards.filter(c=>!CARDS[c].batch&&!CARDS[c].missing).length;
+    const m=missingIn(g.key).length;
+    return `<section class="gsec">
+      <div class="gh"><b>${g.name}</b><span>${g.desc} · ${free} of ${cards.length} on wall${m?` · <em>${m} missing</em>`:''}</span></div>
+      <div class="grid">${cards.map(c=>{
+        const s=CARDS[c].missing?'missing':CARDS[c].batch?'out':'wall';
+        const t=CARDS[c].missing?'missing':CARDS[c].batch?'checked out':'on the wall';
+        return `<button class="slot ${s}" onclick="openSheet('${c}')" aria-label="${c}, ${t}">${c}</button>`}).join('')}</div>
+    </section>`;
+  }).join('');
+}
+
+function batchHTML(b,btn){
+  return `<article class="batch">
+    <div class="btop">
+      <div><div class="pj">${esc(b.project)}</div><div class="sb">${esc(b.taker)} · ${fmt(b.date)}</div></div>
+      <div class="pill">${b.cards.length} out</div>
+    </div>
+    <div class="ids">${chipsFor(b.cards)}</div>
+    ${btn?`<div class="brow">
+      <button class="btn2" onclick="ret(${b.id})">All ${b.cards.length} came back</button>
+      <button class="btn2 sec" onclick="triage(${b.id})">Some didn't</button></div>`:''}
+  </article>`;
+}
+function chipsFor(cards){
+  const by={}; cards.forEach(c=>{(by[CARDS[c].group] ||= []).push(c)});
+  return Object.keys(by).map(k=>{
+    const l=by[k].sort(natural),r=asRange(l);
+    return r?`<span class="cid">${r}</span>`:l.map(c=>`<span class="cid">${c}</span>`).join('');
+  }).join('');
+}
+
+/* ---------- take ---------- */
+function renderTake(){
+  const cur=document.getElementById('pj').value.trim();
+  document.getElementById('pjChips').innerHTML=RECENT.map(p=>
+    `<button class="chip" aria-pressed="${cur===p}" onclick="setPj('${p}')">${p}</button>`).join('');
+
+  document.getElementById('qtyBox').innerHTML=GROUPS.map(g=>{
+    const a=avail(g.key).length,q=draft[g.key]||0,m=missingIn(g.key).length;
+    const cls=a===0?'none':a<=3?'low':'';
+    return `<div class="qrow">
+      <div class="m"><div class="nm">${g.name}<i>${g.desc}</i></div>
+      <div class="av ${cls}">${a} available${m?` · <em>${m} missing</em>`:''}</div></div>
+      <div class="step" data-on="${q>0}">
+        <button onclick="bump('${g.key}',-1)" ${q<=0?'disabled':''} aria-label="One fewer ${g.name}">−</button>
+        <span class="n" aria-live="polite" aria-label="${q} ${g.name}">${q}</span>
+        <button onclick="bump('${g.key}',1)" ${q>=a?'disabled':''} aria-label="One more ${g.name}">+</button>
+      </div></div>`;
+  }).join('');
+
+  const a=assign();
+  document.getElementById('preview').innerHTML=a.length?`
+    <h2>You'll be taking</h2>
+    <div class="panel">${a.map(x=>{
+      const r=asRange(x.cards);
+      return `<div class="agrp"><div class="lab">${x.g.name} · ${x.cards.length} card${x.cards.length>1?'s':''}</div>
+      ${r?`<div class="rng">${r}</div>`:`<div class="ids">${x.cards.map(c=>`<span class="cid">${c}</span>`).join('')}</div>`}</div>`;
+    }).join('')}
+    <p class="note">Picked for you, lowest free slots first, skipping anything flagged missing.</p></div>`:'';
+}
+function setPj(p){document.getElementById('pj').value=p;renderTake();renderBar()}
+function bump(k,d){const a=avail(k).length;draft[k]=Math.max(0,Math.min(a,(draft[k]||0)+d));renderTake();renderBar()}
+
+/* ---------- return ---------- */
+function renderReturn(){
+  document.getElementById('retList').innerHTML=BATCHES.length
+    ?BATCHES.map(b=>batchHTML(b,true)).join('')
+    :`<p class="empty"><b>Nothing is checked out.</b>Once someone takes a batch, you'll be able to return it from here in one tap.</p>`;
+}
+function ret(bid){
+  const before=snapshot(), b=BATCHES.find(x=>x.id===bid); if(!b)return;
+  const n=b.cards.length;
+  b.cards.forEach(c=>CARDS[c].batch=null);
+  BATCHES=BATCHES.filter(x=>x.id!==bid);
+  go(BATCHES.length?'return':'home');
+  toast(n+' cards back on the wall',before);
+}
+
+/* ---------- triage ---------- */
+function triage(bid){triageId=bid;triagePick=new Set();go('triage')}
+function renderTriage(){
+  const b=BATCHES.find(x=>x.id===triageId); if(!b){go('return');return}
+  document.getElementById('triageBox').innerHTML=`
+    <div class="btop"><div><div class="pj">${esc(b.project)}</div>
+    <div class="sb">${esc(b.taker)} · ${fmt(b.date)}</div></div></div>
+    <div class="ids">${b.cards.sort(natural).map(c=>
+      `<button class="pick" aria-pressed="${triagePick.has(c)}" onclick="tog('${c}')">${c}</button>`).join('')}</div>`;
+}
+function tog(c){triagePick.has(c)?triagePick.delete(c):triagePick.add(c);renderTriage();renderBar()}
+function commitTriage(){
+  const before=snapshot(), b=BATCHES.find(x=>x.id===triageId); if(!b)return;
+  const gone=[...triagePick], back=b.cards.filter(c=>!triagePick.has(c));
+  back.forEach(c=>CARDS[c].batch=null);
+  gone.forEach(c=>{CARDS[c].batch=null;CARDS[c].missing=true;
+    CARDS[c].why="Didn't come back from "+b.project;CARDS[c].since=today()});
+  BATCHES=BATCHES.filter(x=>x.id!==b.id);
+  go('home');
+  toast(gone.length?`${back.length} back · ${gone.length} flagged missing`:`${back.length} cards back on the wall`,before);
+}
+
+/* ---------- submit ---------- */
+function submit(){
+  const project=document.getElementById('pj').value.trim();
+  const taker=document.getElementById('taker').value.trim()||ME;
+  const date=document.getElementById('dt').value||today();
+  const a=assign(); if(!project||!a.length)return;
+  const cards=a.flatMap(x=>x.cards);
+  const b={id:seq++,project,taker,date,cards};
+  cards.forEach(c=>CARDS[c].batch=b.id);
+  BATCHES.unshift(b);
+  document.getElementById('doneSub').textContent=`${cards.length} cards · ${project} · ${fmt(date)}`;
+  document.getElementById('doneIds').innerHTML=a.map(x=>{
+    const r=asRange(x.cards);
+    return `<div class="agrp"><div class="lab">${x.g.name}</div>
+    ${r?`<div class="rng xl">${r}</div>`:`<div class="ids">${x.cards.map(c=>`<span class="cid rng">${c}</span>`).join('')}</div>`}</div>`;
+  }).join('');
+  draft={}; go('done');
+}
+
+/* ---------- sheet ---------- */
+const sheet=document.getElementById('sheet');
+function openSheet(cid){
+  const c=CARDS[cid], b=c.batch?BATCHES.find(x=>x.id===c.batch):null;
+  let st,acts;
+  if(c.missing){
+    st=`<b class="gone">Missing.</b> ${esc(c.why)}. Flagged ${fmt(c.since)}.`;
+    acts=`<button class="good" onclick="unflag('${cid}');closeSheet()">Found it, back on the wall</button>`;
+  }else if(b){
+    st=`<b class="out">Checked out.</b> ${esc(b.project)} — ${esc(b.taker)}, ${fmt(b.date)}.`;
+    acts=`<button class="good" onclick="oneBack('${cid}')">Back on the wall</button>
+          <button class="danger" onclick="flagMissing('${cid}','Never came back from ${esc(b.project)}');closeSheet()">Flag missing</button>`;
+  }else{
+    st=`<b class="ok">On the wall.</b> Nobody has it checked out.`;
+    acts=`<button class="danger" onclick="flagMissing('${cid}','Not in its slot');closeSheet()">Not in its slot, flag missing</button>`;
+  }
+  document.getElementById('sheetIn').innerHTML=
+    `<h2 class="sid" style="margin:0">${cid}</h2><p class="sst">${st}</p>
+     <div class="sact">${acts}<button onclick="closeSheet()">Cancel</button></div>`;
+  sheet.showModal();
+}
+function closeSheet(){sheet.close();render()}
+sheet.addEventListener('click',e=>{if(e.target===sheet)closeSheet()});
+function oneBack(cid){
+  const before=snapshot(), c=CARDS[cid], b=BATCHES.find(x=>x.id===c.batch);
+  if(b){b.cards=b.cards.filter(x=>x!==cid); if(!b.cards.length)BATCHES=BATCHES.filter(x=>x.id!==b.id)}
+  c.batch=null; closeSheet(); toast(cid+' is back on the wall',before);
+}
+
+/* ---------- action bar ---------- */
+function renderBar(){
+  const bar=document.getElementById('bar'),inn=document.getElementById('barIn');
+  let html='';
+  if(view==='take'){
+    const ok=document.getElementById('pj').value.trim()&&totalWanted()>0,n=totalWanted();
+    html=`<button class="go" ${ok?'':'disabled'} onclick="submit()">${
+      n?'Take '+n+' card'+(n>1?'s':''):'Pick some cards'}</button>`;
+  }else if(view==='done'){
+    html=`<button class="go" onclick="go('home')">Done</button>`;
+  }else if(view==='triage'){
+    const n=triagePick.size;
+    html=`<button class="go ${n?'warn':''}" onclick="commitTriage()">${
+      n?'Flag '+n+' missing, return the rest':'Nothing missing, return all'}</button>`;
+  }
+  bar.classList.toggle('hide',!html); inn.innerHTML=html;
+}
+
+/* ---------- utils ---------- */
+function today(){return new Date().toISOString().slice(0,10)}
+function fmt(s){if(!s)return'';const[y,m,d]=s.split('-');return +m+'/'+ +d}
+function esc(s){return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
+
+let tT;
+function toast(msg,before){
+  lastUndo=before||null;
+  document.getElementById('toastMsg').textContent=msg;
+  document.getElementById('toastUndo').classList.toggle('hide',!before);
+  const t=document.getElementById('toast'); t.classList.add('show');
+  clearTimeout(tT); tT=setTimeout(()=>{t.classList.remove('show');lastUndo=null},5000);
+  render();
+}
+function undo(){
+  if(!lastUndo)return;
+  restore(lastUndo); lastUndo=null;
+  document.getElementById('toast').classList.remove('show');
+  clearTimeout(tT);
+}
+
+/* ---------- boot ---------- */
+document.getElementById('taker').value=ME;
+document.getElementById('dt').value=today();
+document.getElementById('pj').addEventListener('input',()=>{renderBar()});
+document.getElementById('pj').addEventListener('blur',renderTake);
+
+(function seed(){
+  [['SAVBAN ASG',{L:10,P:6}],['Overtime',{CF:3}]].forEach(([p,d])=>{
+    draft=d; const a=assign(),cards=a.flatMap(x=>x.cards);
+    const b={id:seq++,project:p,taker:ME,date:today(),cards};
+    cards.forEach(c=>CARDS[c].batch=b.id); BATCHES.unshift(b);
+  });
+  draft={};
+  [['CF-10','Not in its slot'],['GLD-5','Not in its slot']].forEach(([c,w])=>{
+    CARDS[c].missing=true; CARDS[c].why=w; CARDS[c].since=today();
+  });
+})();
+
+go('home');
+</script>
+</body>
+</html>

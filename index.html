@@ -242,6 +242,27 @@ input:focus-visible{border-color:var(--accent);outline-offset:1px}
 .slot:active{transform:none}
 
 /* ---- missing rows ---- */
+/* ---- history ---- */
+.logday{font-size:var(--t-sm);font-weight:600;color:var(--ink-3);margin:var(--sp-5) 0 var(--sp-2)}
+.logday:first-child{margin-top:0}
+.lrow{display:flex;gap:var(--sp-3);padding:var(--sp-3) 0;border-bottom:1px solid var(--line)}
+.lrow:last-child{border-bottom:0}
+.ltime{flex:0 0 62px;font-size:var(--t-sm);color:var(--ink-3);font-variant-numeric:tabular-nums}
+.lbody{flex:1;min-width:0}
+.lwhat{font-size:var(--t-base);text-wrap:pretty}
+.lwhat b{font-weight:600}
+.lcards{margin-top:var(--sp-2)}
+.lnote{font-size:var(--t-sm);color:var(--ink-3);margin-top:2px}
+.ldot{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:6px;vertical-align:middle}
+.ldot.out{background:var(--out)} .ldot.ok{background:var(--ok)}
+.ldot.gone{background:var(--gone)} .ldot.neutral{background:var(--line-strong)}
+.loglink{display:block;width:100%;min-height:var(--tap);margin-top:var(--sp-5);background:none;
+  border:1px solid var(--line);border-radius:var(--r);color:var(--ink-2);
+  font:600 var(--t-base) inherit;cursor:pointer;transition:all var(--dur) var(--ease)}
+@media (hover:hover){.loglink:hover{background:var(--surface-2);color:var(--ink)}}
+.chist{margin-top:var(--sp-5);border-top:1px solid var(--line);padding-top:var(--sp-3)}
+.chist .h{font-size:var(--t-sm);font-weight:600;color:var(--ink-3);margin-bottom:var(--sp-1)}
+
 .sync{font-size:var(--t-xs);font-weight:600;padding:3px var(--sp-2);border-radius:var(--r-sm);
   white-space:nowrap;border:1px solid transparent}
 .sync.off{background:var(--out-bg);border-color:var(--out-line);color:var(--out)}
@@ -410,6 +431,7 @@ dialog.sheet[open]::backdrop{animation:fade 240ms var(--ease)}
 
     <h2>Every slot<span class="c">Tap a card to change its status</span></h2>
     <div id="wallGrid"></div>
+    <button class="loglink" onclick="go('log')">View full history →</button>
   </section>
 
   <!-- TAKE -->
@@ -455,6 +477,13 @@ dialog.sheet[open]::backdrop{animation:fade 240ms var(--ease)}
   </section>
 
   <!-- TRIAGE -->
+  <section id="v-log" class="hide">
+    <button class="back" onclick="go('home')">← The wall</button>
+    <h1>History</h1>
+    <p class="lede">Everything that's happened to the wall, newest first.</p>
+    <div style="margin-top:var(--sp-5)" id="logList"></div>
+  </section>
+
   <section id="v-triage" class="hide">
     <button class="back" onclick="go('return')">← Back</button>
     <h1>What's missing?</h1>
@@ -552,7 +581,7 @@ const id=(g,i)=>g.key+'-'+(g.pad?String(i).padStart(g.pad,'0'):i);
 let ME='\u2014';
 const RECENT=['SAVBAN ASG','Bananas ASG','Overtime','Squad Games','Can We Score'];
 
-let GROUPS=[], CARDS={}, BATCHES=[];
+let GROUPS=[], CARDS={}, BATCHES=[], LOG=[];
 let SEL=new Set(), OPEN=new Set(), MISSOPEN=false, triageId=null, triagePick=new Set(), lastUndo=null;
 
 const avail=k=>Object.keys(CARDS).filter(c=>CARDS[c].group===k&&!CARDS[c].batch&&!CARDS[c].missing);
@@ -563,9 +592,9 @@ const natural=(a,b)=>{const na=+a.replace(/\D/g,''),nb=+b.replace(/\D/g,'');
   return a.replace(/[\d-]/g,'').localeCompare(b.replace(/[\d-]/g,''))||na-nb};
 
 const snapshot=()=>({cards:structuredClone(CARDS),batches:structuredClone(BATCHES),
-  groups:structuredClone(GROUPS)});
+  groups:structuredClone(GROUPS),log:structuredClone(LOG)});
 function restore(s){
-  CARDS=s.cards;BATCHES=s.batches;GROUPS=s.groups;
+  CARDS=s.cards;BATCHES=s.batches;GROUPS=s.groups;LOG=s.log||[];
   if(DB) DB.set(toDb()); else render();
 }
 
@@ -602,11 +631,12 @@ function asRange(cards){
    ============================================================ */
 let DB=null, ONLINE=false, BOOTED=false;
 
-const toDb  =()=>({cards:CARDS,batches:BATCHES,groups:GROUPS});
+const toDb  =()=>({cards:CARDS,batches:BATCHES,groups:GROUPS,log:LOG});
 function fromDb(d){
   CARDS  = d.cards  || {};
   BATCHES= d.batches|| [];
   GROUPS = d.groups || [];
+  LOG    = d.log    || [];
   Object.values(CARDS).forEach(c=>{ c.batch=c.batch||null; c.missing=!!c.missing;
     c.why=c.why||''; c.since=c.since||''; });
   BATCHES.forEach(b=>{ b.cards=b.cards||[]; });
@@ -616,7 +646,7 @@ function fromDb(d){
 function freshWall(){
   const cards={};
   RAILS.forEach(g=>{ for(let i=1;i<=g.n;i++) cards[id(g,i)]={group:g.key,batch:null,missing:false,why:'',since:''} });
-  return {cards,batches:[],groups:RAILS.map(({key,name,desc,pad})=>({key,name,desc,pad}))};
+  return {cards,batches:[],groups:RAILS.map(({key,name,desc,pad})=>({key,name,desc,pad})),log:[]};
 }
 
 const newId=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,6);
@@ -630,13 +660,15 @@ const INTENTS={
     const b={id:newId(),project,taker,date,cards};
     cards.forEach(c=>S.cards[c].batch=b.id);
     S.batches.unshift(b);
-    return {msg:cards.length+' cards checked out'};
+    return {msg:cards.length+' cards checked out',
+            log:{act:'took',cards,project,who:taker}};
   },
   returnBatch(S,{bid}){
     const b=S.batches.find(x=>x.id===bid); if(!b) return {abort:'That batch was already returned.'};
     b.cards.forEach(c=>{ if(S.cards[c]) S.cards[c].batch=null });
     S.batches=S.batches.filter(x=>x.id!==bid);
-    return {msg:b.cards.length+' cards back on the wall'};
+    return {msg:b.cards.length+' cards back on the wall',
+            log:{act:'returned',cards:b.cards,project:b.project}};
   },
   triage(S,{bid,gone}){
     const b=S.batches.find(x=>x.id===bid); if(!b) return {abort:'That batch was already returned.'};
@@ -646,29 +678,35 @@ const INTENTS={
       S.cards[c].why="Didn't come back from "+b.project; S.cards[c].since=today(); }});
     S.batches=S.batches.filter(x=>x.id!==bid);
     return {msg:gone.length?back.length+' back · '+gone.length+' flagged missing'
-                           :back.length+' cards back on the wall'};
+                           :back.length+' cards back on the wall',
+            log:gone.length
+              ?{act:'partial',cards:back,project:b.project,gone}
+              :{act:'returned',cards:back,project:b.project}};
   },
   oneBack(S,{cid}){
     const c=S.cards[cid]; if(!c||!c.batch) return {abort:cid+' is already on the wall.'};
     const b=S.batches.find(x=>x.id===c.batch);
+    const project=b?b.project:'';
     if(b){ b.cards=b.cards.filter(x=>x!==cid); if(!b.cards.length) S.batches=S.batches.filter(x=>x.id!==b.id); }
     c.batch=null;
-    return {msg:cid+' is back on the wall'};
+    return {msg:cid+' is back on the wall',log:{act:'returned',cards:[cid],project}};
   },
   flag(S,{cid,why}){
     const c=S.cards[cid]; if(!c) return {abort:cid+' is no longer on the wall.'};
+    let project='';
     c.missing=true; c.why=why||'Not in its slot'; c.since=today();
     if(c.batch){
       const b=S.batches.find(x=>x.id===c.batch);
-      if(b){ b.cards=b.cards.filter(x=>x!==cid); if(!b.cards.length) S.batches=S.batches.filter(x=>x.id!==b.id); }
+      if(b){ project=b.project; b.cards=b.cards.filter(x=>x!==cid);
+             if(!b.cards.length) S.batches=S.batches.filter(x=>x.id!==b.id); }
       c.batch=null;
     }
-    return {msg:cid+' flagged missing'};
+    return {msg:cid+' flagged missing',log:{act:'flagged',cards:[cid],project,note:c.why}};
   },
   unflag(S,{cid}){
     const c=S.cards[cid]; if(!c) return {abort:cid+' is no longer on the wall.'};
     c.missing=false; c.why=''; c.since='';
-    return {msg:cid+' is back on the wall'};
+    return {msg:cid+' is back on the wall',log:{act:'found',cards:[cid]}};
   },
   addCards(S,{k,count}){
     const g=S.groups.find(x=>x.key===k); if(!g||count<1) return {abort:'That rail is gone.'};
@@ -678,41 +716,55 @@ const INTENTS={
     for(let i=0;i<count;i++){ const cid=id(g,start+i);
       S.cards[cid]={group:k,batch:null,missing:false,why:'',since:''}; made.push(cid); }
     return {msg:made.length===1?made[0]+' added to the wall'
-      :made.length+' cards added · '+made[0]+' → '+made[made.length-1]};
+      :made.length+' cards added · '+made[0]+' → '+made[made.length-1],
+      log:{act:'added',cards:made}};
   },
   removeCard(S,{cid}){
     const c=S.cards[cid]; if(!c) return {abort:cid+' is already gone.'};
     if(c.batch) return {abort:cid+' is checked out — return it first'};
     const k=c.group; delete S.cards[cid];
     if(!Object.keys(S.cards).some(x=>S.cards[x].group===k)) S.groups=S.groups.filter(g=>g.key!==k);
-    return {msg:cid+' removed from the wall'};
+    return {msg:cid+' removed from the wall',log:{act:'removed',cards:[cid]}};
   },
   addRail(S,{code,name,count}){
     const k=code.trim().toUpperCase();
     if(S.groups.some(g=>g.key===k)) return {abort:'There is already a '+k+' rail.'};
     const g={key:k,name:k,desc:(name||'').trim()||'cards',pad:0};
     S.groups.push(g);
-    for(let i=1;i<=count;i++) S.cards[id(g,i)]={group:k,batch:null,missing:false,why:'',since:''};
-    return {msg:k+' rail created with '+count+' card'+(count>1?'s':'')};
+    const made=[];
+    for(let i=1;i<=count;i++){ const cid=id(g,i);
+      S.cards[cid]={group:k,batch:null,missing:false,why:'',since:''}; made.push(cid); }
+    return {msg:k+' rail created with '+count+' card'+(count>1?'s':''),
+            log:{act:'rail',cards:made,note:k+' · '+g.desc}};
   },
 };
 
 /* run an intent: against the server inside a transaction, or locally in preview */
+const LOG_MAX=600;
+function writeLog(S,entry){
+  if(!entry) return;
+  S.log=S.log||[];
+  S.log.unshift(Object.assign({t:Date.now(),who:ME},entry));
+  if(S.log.length>LOG_MAX) S.log.length=LOG_MAX;
+}
+
 function apply(name,payload){
   const before=snapshot();
   if(!DB){
-    const S={cards:CARDS,batches:BATCHES,groups:GROUPS};
+    const S={cards:CARDS,batches:BATCHES,groups:GROUPS,log:LOG};
     const r=INTENTS[name](S,payload);
     if(r.abort){ toast(r.abort); return; }
-    CARDS=S.cards; BATCHES=S.batches; GROUPS=S.groups;
+    writeLog(S,r.log);
+    CARDS=S.cards; BATCHES=S.batches; GROUPS=S.groups; LOG=S.log;
     toast(r.msg,before); return;
   }
   let aborted=null;
   DB.transaction(cur=>{
     const S=cur&&cur.cards?structuredClone(cur):freshWall();
-    S.batches=S.batches||[]; S.groups=S.groups||[];
+    S.batches=S.batches||[]; S.groups=S.groups||[]; S.log=S.log||[];
     const r=INTENTS[name](S,payload);
     if(r.abort){ aborted=r.abort; return; }
+    writeLog(S,r.log);
     aborted=null; window.__msg=r.msg;
     return S;
   },(err,committed)=>{
@@ -742,7 +794,7 @@ function railCodeError(code){
    ROUTING
    ============================================================ */
 let view='home';
-const VIEWS=['home','take','done','return','triage'];
+const VIEWS=['home','take','done','return','triage','log'];
 function go(v){
   view=v;
   VIEWS.forEach(x=>document.getElementById('v-'+x).classList.toggle('hide',x!==v));
@@ -753,7 +805,7 @@ function showMissing(){ if(!allMissing().length)return; MISSOPEN=true; renderHom
 
 function render(){
   document.getElementById('who').textContent=String(ME).split(' ')[0]+' · '+fmt(today());
-  ({home:renderHome,take:renderTake,return:renderReturn,triage:renderTriage}[view]||(()=>{}))();
+  ({home:renderHome,take:renderTake,return:renderReturn,triage:renderTriage,log:renderLog}[view]||(()=>{}))();
   renderBar();
 }
 
@@ -968,8 +1020,13 @@ function openSheet(cid){
     st=`<b class="ok">On the wall.</b> Nobody has it checked out.`;
     acts=`<button class="danger" onclick="flagMissing('${cid}','Not in its slot');closeSheet()">Not in its slot, flag missing</button>`+drop;
   }
+  const hist=cardHistory(cid);
+  const histHtml=hist.length?`<div class="chist"><div class="h">Recent history</div>
+    ${hist.map(e=>`<div class="lrow"><div class="ltime">${dayKey(e.t)==='Today'?clock(e.t):dayKey(e.t)}</div>
+      <div class="lbody"><div class="lwhat"><span class="ldot ${(ACT[e.act]||{}).dot||'neutral'}"></span>${logSentence(e)}</div>
+      ${e.note?`<div class="lnote">${esc(e.note)}</div>`:''}</div></div>`).join('')}</div>`:'';
   document.getElementById('sheetIn').innerHTML=
-    `<h2 class="sid" style="margin:0">${cid}</h2><p class="sst">${st}</p>
+    `<h2 class="sid" style="margin:0">${cid}</h2><p class="sst">${st}</p>${histHtml}
      <div class="sact">${acts}<button onclick="closeSheet()">Cancel</button></div>`;
   sheet.showModal();
 }
@@ -1068,6 +1125,79 @@ function renderBar(){
 }
 
 /* ---------- utils ---------- */
+/* ============================================================
+   HISTORY
+   ============================================================ */
+const ACT={
+  took:{dot:'out'}, returned:{dot:'ok'}, partial:{dot:'gone'}, flagged:{dot:'gone'},
+  found:{dot:'ok'}, added:{dot:'neutral'}, removed:{dot:'neutral'}, rail:{dot:'neutral'},
+};
+
+function logSentence(e){
+  const who=esc(e.who||'Someone'), n=(e.cards||[]).length;
+  const from=e.project?' from <b>'+esc(e.project)+'</b>':'';
+  switch(e.act){
+    case 'took':     return `<b>${who}</b> took ${n} card${n>1?'s':''}`+(e.project?' for <b>'+esc(e.project)+'</b>':'');
+    case 'returned': return `<b>${who}</b> returned ${n} card${n>1?'s':''}${from}`;
+    case 'partial':  return `<b>${who}</b> returned ${n} card${n>1?'s':''}${from}, ${(e.gone||[]).length} didn't come back`;
+    case 'flagged':  return `<b>${who}</b> flagged ${esc((e.cards||[])[0]||'')} missing`;
+    case 'found':    return `<b>${who}</b> found ${esc((e.cards||[])[0]||'')}`;
+    case 'added':    return `<b>${who}</b> added ${n} card${n>1?'s':''} to the wall`;
+    case 'removed':  return `<b>${who}</b> removed ${esc((e.cards||[])[0]||'')} from the wall`;
+    case 'rail':     return `<b>${who}</b> created a new rail`;
+    default:         return `<b>${who}</b> made a change`;
+  }
+}
+function logChips(cards){
+  if(!cards||!cards.length) return '';
+  const sorted=[...cards].sort(natural), r=asRange(sorted);
+  return `<div class="ids lcards">${r?`<span class="cid">${r}</span>`
+    :sorted.slice(0,14).map(c=>`<span class="cid">${c}</span>`).join('')
+      +(sorted.length>14?`<span class="cid">+${sorted.length-14}</span>`:'')}</div>`;
+}
+function logRow(e){
+  const dot=(ACT[e.act]||{}).dot||'neutral';
+  const gone=(e.gone||[]).length?`<div class="lnote">Didn't come back: ${e.gone.join(', ')}</div>`:'';
+  const note=e.note?`<div class="lnote">${esc(e.note)}</div>`:'';
+  return `<div class="lrow">
+    <div class="ltime">${clock(e.t)}</div>
+    <div class="lbody">
+      <div class="lwhat"><span class="ldot ${dot}"></span>${logSentence(e)}</div>
+      ${gone}${note}${logChips(e.cards)}
+    </div></div>`;
+}
+function renderLog(){
+  const el=document.getElementById('logList');
+  if(!LOG.length){
+    el.innerHTML=`<p class="empty"><b>Nothing has happened yet.</b>Check some cards out and this fills in — who took what, when, and for which project.</p>`;
+    return;
+  }
+  const days=[];
+  LOG.forEach(e=>{
+    const d=dayKey(e.t);
+    if(!days.length||days[days.length-1].d!==d) days.push({d,items:[]});
+    days[days.length-1].items.push(e);
+  });
+  el.innerHTML=days.map(g=>
+    `<div class="logday">${g.d}</div><div class="list">${g.items.map(logRow).join('')}</div>`).join('');
+}
+function cardHistory(cid,limit){
+  return LOG.filter(e=>(e.cards||[]).includes(cid)||(e.gone||[]).includes(cid)).slice(0,limit||4);
+}
+function clock(t){
+  const d=new Date(t||0); let h=d.getHours();
+  const m=String(d.getMinutes()).padStart(2,'0'), ap=h>=12?'pm':'am';
+  return (h%12||12)+':'+m+ap;
+}
+function dayKey(t){
+  const d=new Date(t||0), n=new Date(), y=new Date();
+  y.setDate(n.getDate()-1);
+  const same=(a,b)=>a.toDateString()===b.toDateString();
+  if(same(d,n)) return 'Today';
+  if(same(d,y)) return 'Yesterday';
+  return d.toLocaleDateString(undefined,{weekday:'long',month:'numeric',day:'numeric'});
+}
+
 function today(){return new Date().toISOString().slice(0,10)}
 function fmt(s){if(!s)return'';const[y,m,d]=s.split('-');return +m+'/'+ +d}
 function esc(s){return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}

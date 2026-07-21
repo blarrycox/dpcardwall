@@ -162,9 +162,18 @@ input:focus-visible{border-color:var(--accent);outline-offset:1px}
 .chip[aria-pressed=true]{background:var(--accent-soft);border-color:var(--accent);color:var(--accent);font-weight:600}
 
 /* ---- quantity rows ---- */
-.qrow{display:flex;align-items:center;gap:var(--sp-3);padding:var(--sp-3) 0;border-bottom:1px solid var(--line)}
-.qrow:last-child{border-bottom:0}
-.qrow .m{flex:1;min-width:0}
+.qrow{display:flex;align-items:center;gap:var(--sp-3);padding:var(--sp-3) 0}
+.qgroup{border-bottom:1px solid var(--line)}
+.qgroup:last-child{border-bottom:0}
+.qrow .m{flex:1;min-width:0;background:none;border:0;padding:0;font:inherit;color:inherit;
+  cursor:pointer;text-align:left;display:block}
+.pickx{color:var(--accent);font-weight:600;white-space:nowrap}
+.picker{display:none;padding:0 0 var(--sp-4)}
+.picker.open{display:block}
+.pkhint{font-size:var(--t-sm);color:var(--ink-3);margin:0 0 var(--sp-2)}
+.slot.sel{background:var(--accent);border-color:var(--accent);color:#fff}
+.slot.dis{opacity:.45;cursor:not-allowed}
+@media (hover:hover){.slot.dis:hover{border-color:var(--line);transform:none}}
 .qrow .nm{font-size:var(--t-md);font-weight:600;letter-spacing:-.15px}
 .qrow .nm i{font-style:normal;font-size:var(--t-sm);font-weight:400;color:var(--ink-3);margin-left:var(--sp-2)}
 .qrow .av{font-size:var(--t-sm);color:var(--ink-3);margin-top:1px}
@@ -506,7 +515,7 @@ const RECENT=['SAVBAN ASG','Bananas ASG','Overtime','Squad Games','Can We Score'
 
 let CARDS={};
 GROUPS.forEach(g=>{for(let i=1;i<=g.n;i++)CARDS[id(g,i)]={group:g.key,batch:null,missing:false,why:'',since:''}});
-let BATCHES=[], seq=1, draft={}, triageId=null, triagePick=new Set(), lastUndo=null;
+let BATCHES=[], seq=1, SEL=new Set(), OPEN=new Set(), triageId=null, triagePick=new Set(), lastUndo=null;
 
 const avail=k=>Object.keys(CARDS).filter(c=>CARDS[c].group===k&&!CARDS[c].batch&&!CARDS[c].missing);
 const missingIn=k=>Object.keys(CARDS).filter(c=>CARDS[c].group===k&&CARDS[c].missing);
@@ -518,16 +527,18 @@ const natural=(a,b)=>{const na=+a.replace(/\D/g,''),nb=+b.replace(/\D/g,'');
 const snapshot=()=>({cards:structuredClone(CARDS),batches:structuredClone(BATCHES),seq});
 function restore(s){CARDS=s.cards;BATCHES=s.batches;seq=s.seq;render()}
 
+/* SEL is the single source of truth for a checkout. The stepper and the
+   card grid are two editors of the same set, never two modes. */
+const selIn=k=>[...SEL].filter(c=>CARDS[c].group===k);
+const totalWanted=()=>SEL.size;
 function assign(){
   const out=[];
   GROUPS.forEach(g=>{
-    const want=draft[g.key]||0; if(!want)return;
-    const got=avail(g.key).sort(natural).slice(0,want);
-    if(got.length)out.push({g,cards:got});
+    const cards=selIn(g.key).sort(natural);
+    if(cards.length)out.push({g,cards});
   });
   return out;
 }
-const totalWanted=()=>Object.values(draft).reduce((a,b)=>a+b,0);
 function asRange(cards){
   if(cards.length<3)return null;
   const n=cards.map(c=>+c.replace(/\D/g,''));
@@ -634,18 +645,45 @@ function renderTake(){
     `<button class="chip" aria-pressed="${cur===p}" onclick="setPj('${p}')">${p}</button>`).join('');
 
   document.getElementById('qtyBox').innerHTML=GROUPS.map(g=>{
-    const a=avail(g.key).length,q=draft[g.key]||0,m=missingIn(g.key).length;
-    const cls=a===0?'none':a<=3?'low':'';
-    return `<div class="qrow">
-      <div class="m"><div class="nm">${g.name}<i>${g.desc}</i></div>
-      <div class="av ${cls}">${a} available${m?` · <em>${m} missing</em>`:''}</div></div>
-      <div class="step" data-on="${q>0}">
-        <button onclick="bump('${g.key}',-1)" ${q<=0?'disabled':''} aria-label="One fewer ${g.name}">−</button>
-        <span class="n" aria-live="polite" aria-label="${q} ${g.name}">${q}</span>
-        <button onclick="bump('${g.key}',1)" ${q>=a?'disabled':''} aria-label="One more ${g.name}">+</button>
-      </div></div>`;
+    const k=g.key,a=avail(k).length,n=selIn(k).length,open=OPEN.has(k);
+    const cards=Object.keys(CARDS).filter(c=>CARDS[c].group===k).sort(natural);
+    return `<div class="qgroup">
+      <div class="qrow">
+        <button class="m" onclick="toggleOpen('${k}')" aria-expanded="${open}" aria-controls="pk-${k}">
+          <span class="nm">${g.name}<i>${g.desc}</i></span>
+          <span class="av" id="av-${k}">${availLine(g)}</span>
+        </button>
+        <div class="step" data-on="${n>0}">
+          <button onclick="bump('${k}',-1)" ${n<=0?'disabled':''} aria-label="One fewer ${g.name}">−</button>
+          <span class="n" id="n-${k}" aria-live="polite" aria-label="${n} ${g.name} selected">${n}</span>
+          <button onclick="bump('${k}',1)" ${n>=a?'disabled':''} aria-label="One more ${g.name}">+</button>
+        </div>
+      </div>
+      <div class="picker ${open?'open':''}" id="pk-${k}">
+        <p class="pkhint">Tap the exact cards you're taking.</p>
+        <div class="grid">${cards.map(c=>{
+          const free=!CARDS[c].batch&&!CARDS[c].missing;
+          const why=CARDS[c].missing?'missing':CARDS[c].batch?'already checked out':'';
+          return free
+            ? `<button class="slot ${SEL.has(c)?'sel':''}" data-c="${c}" onclick="toggleCard('${c}')"
+                 aria-pressed="${SEL.has(c)}">${c}</button>`
+            : `<button class="slot dis" disabled aria-label="${c}, ${why}">${c}</button>`;
+        }).join('')}</div>
+      </div>
+    </div>`;
   }).join('');
 
+  renderPreview();
+}
+
+function availLine(g){
+  const k=g.key,a=avail(k).length,n=selIn(k).length,m=missingIn(k).length;
+  const cls=a===0?'none':a<=3?'low':'';
+  return `<span class="${cls}">${a} available${n?` · ${n} picked`:''}${m?` · <em>${m} missing</em>`:''}</span>`
+    +` · <span class="pickx">${OPEN.has(k)?'Hide ▴':'Pick exact ▾'}</span>`;
+}
+
+function renderPreview(){
   const a=assign();
   document.getElementById('preview').innerHTML=a.length?`
     <h2>You'll be taking</h2>
@@ -654,10 +692,38 @@ function renderTake(){
       return `<div class="agrp"><div class="lab">${x.g.name} · ${x.cards.length} card${x.cards.length>1?'s':''}</div>
       ${r?`<div class="rng">${r}</div>`:`<div class="ids">${x.cards.map(c=>`<span class="cid">${c}</span>`).join('')}</div>`}</div>`;
     }).join('')}
-    <p class="note">Picked for you, lowest free slots first, skipping anything flagged missing.</p></div>`:'';
+    <p class="note">Use − and + to let it pick for you, or open a rail and tap exact cards. Both feed the same list.</p></div>`:'';
 }
+
+/* in-place update so tapping never rebuilds the list or loses your scroll */
+function syncTake(){
+  GROUPS.forEach(g=>{
+    const k=g.key,a=avail(k).length,n=selIn(k).length;
+    const nEl=document.getElementById('n-'+k); if(!nEl)return;
+    nEl.textContent=n; nEl.setAttribute('aria-label',n+' '+g.name+' selected');
+    const step=nEl.parentElement; step.dataset.on=n>0;
+    const btns=step.querySelectorAll('button');
+    btns[0].disabled=n<=0; btns[1].disabled=n>=a;
+    document.getElementById('av-'+k).innerHTML=availLine(g);
+    const pk=document.getElementById('pk-'+k);
+    if(pk) pk.querySelectorAll('.slot[data-c]').forEach(el=>{
+      const on=SEL.has(el.dataset.c);
+      el.classList.toggle('sel',on); el.setAttribute('aria-pressed',on);
+    });
+  });
+  renderPreview(); renderBar();
+}
+
+/* + takes the next free card; − gives back the one added most recently */
+function bump(k,d){
+  if(d>0){ const next=avail(k).sort(natural).find(c=>!SEL.has(c)); if(next)SEL.add(next); }
+  else   { const mine=selIn(k); if(mine.length)SEL.delete(mine[mine.length-1]); }
+  syncTake();
+}
+function toggleCard(c){ SEL.has(c)?SEL.delete(c):SEL.add(c); syncTake(); }
+function toggleOpen(k){ OPEN.has(k)?OPEN.delete(k):OPEN.add(k); renderTake(); renderBar(); }
+
 function setPj(p){document.getElementById('pj').value=p;renderTake();renderBar()}
-function bump(k,d){const a=avail(k).length;draft[k]=Math.max(0,Math.min(a,(draft[k]||0)+d));renderTake();renderBar()}
 
 /* ---------- return ---------- */
 function renderReturn(){
@@ -712,7 +778,7 @@ function submit(){
     return `<div class="agrp"><div class="lab">${x.g.name}</div>
     ${r?`<div class="rng xl">${r}</div>`:`<div class="ids">${x.cards.map(c=>`<span class="cid rng">${c}</span>`).join('')}</div>`}</div>`;
   }).join('');
-  draft={}; go('done');
+  SEL=new Set(); OPEN=new Set(); go('done');
 }
 
 /* ---------- sheet ---------- */
@@ -790,11 +856,10 @@ document.getElementById('pj').addEventListener('blur',renderTake);
 
 (function seed(){
   [['SAVBAN ASG',{L:10,P:6}],['Overtime',{CF:3}]].forEach(([p,d])=>{
-    draft=d; const a=assign(),cards=a.flatMap(x=>x.cards);
+    const cards=Object.entries(d).flatMap(([k,n])=>avail(k).sort(natural).slice(0,n));
     const b={id:seq++,project:p,taker:'Blaise Larry-Cox',date:today(),cards};
     cards.forEach(c=>CARDS[c].batch=b.id); BATCHES.unshift(b);
   });
-  draft={};
   [['CF-10','Not in its slot'],['GLD-5','Not in its slot']].forEach(([c,w])=>{
     CARDS[c].missing=true; CARDS[c].why=w; CARDS[c].since=today();
   });

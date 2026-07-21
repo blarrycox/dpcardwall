@@ -249,6 +249,17 @@ input:focus-visible{border-color:var(--accent);outline-offset:1px}
 @media (hover:hover){.tabs button:hover{color:var(--ink)}}
 .tabs button[aria-selected=true]{background:var(--surface);color:var(--ink)}
 
+.pcard{border:1px solid var(--line);border-radius:12px;overflow:hidden;margin-top:var(--sp-3);background:var(--surface)}
+.pcard.danger{border-color:var(--gone-line)}
+.phead{padding:var(--sp-3) var(--sp-4) var(--sp-2);display:flex;flex-wrap:wrap;align-items:baseline;gap:var(--sp-2)}
+.pn{font-size:var(--t-md);font-weight:600;letter-spacing:-.2px}
+.pm{font-size:var(--t-sm);color:var(--ink-3)}
+.pstats{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:1px;background:var(--line)}
+.pstats>div{background:var(--surface);padding:var(--sp-3) var(--sp-4)}
+.pstats span{display:block;font-size:var(--t-xs);color:var(--ink-3)}
+.pstats b{display:block;font-size:var(--t-lg);font-weight:700;letter-spacing:-.4px;margin-top:2px}
+.prow{display:flex;gap:var(--sp-2);padding:0 var(--sp-4) var(--sp-4)}
+
 /* ---- ingest pipeline ---- */
 .p-idle{--pc:oklch(48% 0.01 250); --pb:oklch(96% 0.003 250); --pl:oklch(88% 0.005 250)}
 .p-risk{--pc:oklch(48% 0.17 25);  --pb:oklch(95.5% 0.03 25); --pl:oklch(86% 0.07 25)}
@@ -257,6 +268,10 @@ input:focus-visible{border-color:var(--accent);outline-offset:1px}
 .p-near{--pc:oklch(48% 0.10 195); --pb:oklch(95.5% 0.035 195);--pl:oklch(86% 0.06 195)}
 .p-safe{--pc:oklch(45% 0.12 155); --pb:oklch(95.5% 0.035 155);--pl:oklch(85% 0.06 155)}
 
+.newshoot{width:100%;min-height:var(--tap);margin-top:var(--sp-4);background:var(--accent-soft);
+  border:1px solid var(--accent);border-radius:var(--r);color:var(--accent);
+  font:600 var(--t-base) inherit;cursor:pointer;transition:filter var(--dur) var(--ease)}
+@media (hover:hover){.newshoot:hover{filter:brightness(.97)}}
 .shoots{display:flex;gap:var(--sp-2);overflow-x:auto;padding:var(--sp-1) 0 var(--sp-2);
   margin-top:var(--sp-4);scrollbar-width:none}
 .shoots::-webkit-scrollbar{display:none}
@@ -540,6 +555,7 @@ dialog.sheet[open]::backdrop{animation:fade 240ms var(--ease)}
   <section id="v-ingest" class="hide">
     <h1 id="ingTitle">Ingest</h1>
     <p class="lede" id="ingLede"></p>
+    <button class="newshoot" onclick="openShootSheet()">+ New shoot day</button>
     <div class="shoots" id="shoots"></div>
     <div id="ingBody"></div>
   </section>
@@ -859,6 +875,13 @@ const INTENTS={
     const n=syncShoot(S,sid);
     return {msg:project+' created'+(n?' · '+n+' cards pulled in':''),newShoot:sid,
             log:{act:'shoot',cards:[],note:project+(day?' · '+day:'')}};
+  },
+  editShoot(S,{sid,project,day,date}){
+    const sh=S.shoots[sid]; if(!sh) return {abort:'That shoot day is gone.'};
+    const was=sh.project;
+    sh.project=project; sh.day=day; sh.date=date;
+    if(!sameProject(was,project)) syncShoot(S,sid);
+    return {msg:'Shoot day updated'};
   },
   delShoot(S,{sid}){
     const sh=S.shoots[sid]; if(!sh) return {abort:'Already gone.'};
@@ -1325,24 +1348,64 @@ const entriesFor=id=>Object.values(ENTRIES).filter(e=>e.shoot===id)
   .sort((a,b)=>stageIx(a.status)-stageIx(b.status)||natural(a.card||a.label,b.card||b.label));
 const camList=()=>[...new Set(Object.values(CARDS).map(c=>c.cam).filter(Boolean))].sort();
 
+function shootStats(sid){
+  const rows=entriesFor(sid);
+  return {rows,total:rows.length,
+    verified:rows.filter(e=>e.status==='VERIFIED').length,
+    risk:rows.filter(e=>AT_RISK.includes(e.status)).length};
+}
+const recentProjects=()=>[...new Set(BATCHES.map(b=>b.project).filter(Boolean))].slice(0,8);
+
 function renderIngest(){
   const list=shootList();
-  if(CUR&&!SHOOTS[CUR]) CUR=null;
-  if(!CUR&&list.length) CUR=list[0].id;
+  if(CUR&&CUR!=='ALL'&&!SHOOTS[CUR]) CUR=null;
+  if(!CUR) CUR = list.length>1 ? 'ALL' : (list.length?list[0].id:null);
 
   document.getElementById('shoots').innerHTML=
-    list.map(sh=>`<button class="sh" aria-pressed="${sh.id===CUR}" onclick="pickShoot('${sh.id}')">
-      <span class="p">${esc(sh.project)}</span>
-      <span class="d">${esc(sh.day||'')}${sh.day?' · ':''}${fmt(sh.date)}</span></button>`).join('')
-    +`<button class="sh new" onclick="openShootSheet()">+ New shoot day</button>`;
+    (list.length>1?`<button class="sh" aria-pressed="${CUR==='ALL'}" onclick="pickShoot('ALL')">
+      <span class="p">All shoots</span><span class="d">${list.length} running</span></button>`:'')
+    + list.map(sh=>{
+        const st=shootStats(sh.id);
+        return `<button class="sh" aria-pressed="${sh.id===CUR}" onclick="pickShoot('${sh.id}')">
+          <span class="p">${esc(sh.project)}</span>
+          <span class="d">${esc(sh.day||'')}${sh.day?' · ':''}${fmt(sh.date)}${st.risk?' · '+st.risk+' at risk':''}</span></button>`;
+      }).join('');
 
-  const el=document.getElementById('ingBody'), sh=CUR?SHOOTS[CUR]:null;
-  if(!sh){
+  const el=document.getElementById('ingBody');
+
+  if(!list.length){
     document.getElementById('ingTitle').textContent='Ingest';
     document.getElementById('ingLede').textContent='Track every card from the camera to a verified backup.';
     el.innerHTML=`<p class="empty"><b>No shoot days yet.</b>Start one and any cards already checked out to that project drop in automatically.</p>`;
     return;
   }
+
+  if(CUR==='ALL'){
+    const risky=list.reduce((n,sh)=>n+shootStats(sh.id).risk,0);
+    document.getElementById('ingTitle').textContent='All shoots';
+    document.getElementById('ingLede').textContent=
+      list.length+' shoot days running'+(risky?' · '+risky+' cards on a single copy':' · everything is backed up');
+    el.innerHTML=list.map(sh=>{
+      const st=shootStats(sh.id), ok=st.total&&st.verified===st.total&&!st.risk;
+      const tone=st.risk?'p-risk':ok?'p-safe':'p-idle';
+      return `<div class="pcard ${st.risk?'danger':''}">
+        <div class="phead"><span class="pn">${esc(sh.project)}</span>
+          <span class="pm">${esc(sh.day||'')}${sh.day?' · ':''}${fmt(sh.date)}</span></div>
+        <div class="pstats">
+          <div><span>Rows</span><b>${st.total}</b></div>
+          <div><span>Verified</span><b>${st.verified}</b></div>
+          <div class="${tone}" style="background:var(--pb)"><span style="color:var(--pc)">Single copy</span>
+            <b style="color:var(--pc)">${st.risk}</b></div>
+        </div>
+        <div class="prow" style="padding-top:var(--sp-3)">
+          <button class="btn2" onclick="pickShoot('${sh.id}')">Open</button>
+          <button class="btn2 sec" onclick="openShootMenu('${sh.id}')">Edit</button>
+        </div></div>`;
+    }).join('');
+    return;
+  }
+
+  const sh=SHOOTS[CUR];
   document.getElementById('ingTitle').textContent=sh.project;
   document.getElementById('ingLede').textContent=
     (sh.day?sh.day+' · ':'')+new Date(sh.date+'T12:00').toLocaleDateString(undefined,{weekday:'long',month:'long',day:'numeric'});
@@ -1373,7 +1436,11 @@ function renderIngest(){
     if(!grouped.length||grouped[grouped.length-1].k!==st.k) grouped.push({k:st.k,label:st.label,items:[]});
     grouped[grouped.length-1].items.push(e); });
 
-  el.innerHTML=safety+bar+(total
+  const head=`<div class="prow" style="padding:0;margin-top:var(--sp-4)">
+    ${shootList().length>1?`<button class="btn2" onclick="pickShoot('ALL')">← All shoots</button>`:''}
+    <button class="btn2 sec" onclick="openShootMenu('${CUR}')">Edit shoot day</button></div>`;
+
+  el.innerHTML=head+safety+bar+(total
     ? grouped.map(g=>`<div class="grp"><div class="grph">${g.label} · ${g.items.length}</div>
         <div class="list">${g.items.map(ingRow).join('')}</div></div>`).join('')
     : `<p class="empty"><b>Nothing logged for this day yet.</b>Cards checked out to ${esc(sh.project)} land here on their own. Add a row by hand for lavs, drones, and anything not on the wall.</p>`)
@@ -1454,11 +1521,45 @@ function openShootSheet(){
       <input type="date" id="sdate" value="${today()}"></div>
     <div class="sact">
       <button class="good" onclick="saveShoot()">Create shoot day</button>
-      ${CUR?`<button class="danger" onclick="delShoot('${CUR}')">Delete “${esc(SHOOTS[CUR].project)}”</button>`:''}
       <button onclick="closeSheet()">Cancel</button></div>`;
   sheet.showModal();
   document.getElementById('sproj').focus();
 }
+function openShootMenu(sid){
+  const sh=SHOOTS[sid]; if(!sh) return;
+  const st=shootStats(sid), recent=recentProjects();
+  document.getElementById('sheetIn').innerHTML=`
+    <h2 class="sid" style="margin:0">${esc(sh.project)}</h2>
+    <p class="sst">${esc(sh.day||'')}${sh.day?' · ':''}${fmt(sh.date)} · ${st.total} row${st.total===1?'':'s'}${
+      st.risk?' · <b>'+st.risk+' still on a single copy</b>':''}</p>
+    <div class="sfield"><label class="lbl" for="eproj">Project</label>
+      <input type="text" id="eproj" value="${esc(sh.project)}" autocomplete="off"></div>
+    ${recent.length?`<div class="chips">${recent.map(pj=>
+      `<button class="chip" onclick="document.getElementById('eproj').value='${esc(pj)}'">${esc(pj)}</button>`).join('')}</div>`:''}
+    <div class="sfield"><label class="lbl" for="eday">Which day</label>
+      <input type="text" id="eday" value="${esc(sh.day||'')}" autocomplete="off"></div>
+    <div class="sfield"><label class="lbl" for="edate">Shoot date</label>
+      <input type="date" id="edate" value="${esc(sh.date)}"></div>
+    <div class="sact">
+      <button class="good" onclick="saveShootEdit('${sid}')">Save changes</button>
+      <button class="danger" onclick="confirmDelShoot('${sid}')">Delete this shoot day${
+        st.total?' and its '+st.total+' row'+(st.total===1?'':'s'):''}</button>
+      <button onclick="closeSheet()">Cancel</button></div>`;
+  sheet.showModal();
+}
+function saveShootEdit(sid){
+  const project=document.getElementById('eproj').value.trim();
+  const day=document.getElementById('eday').value.trim();
+  const date=document.getElementById('edate').value||today();
+  if(!project){ toast('Give it a project name'); return; }
+  closeSheet(); apply('editShoot',{sid,project,day,date});
+}
+function confirmDelShoot(sid){
+  closeSheet();
+  if(CUR===sid) CUR=null;
+  apply('delShoot',{sid});
+}
+
 function saveShoot(){
   const project=document.getElementById('sproj').value.trim();
   const day=document.getElementById('sday').value.trim();
@@ -1466,7 +1567,6 @@ function saveShoot(){
   if(!project){ toast('Give it a project name'); return; }
   closeSheet(); apply('newShoot',{project,day,date});
 }
-function delShoot(sid){ closeSheet(); CUR=null; apply('delShoot',{sid}); }
 
 /* ============================================================
    HISTORY

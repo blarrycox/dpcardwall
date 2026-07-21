@@ -11,6 +11,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-storage-compat.js"></script>
 <style>
 /* ============================================================
    TOKENS
@@ -65,7 +66,68 @@ body{
   font:400 var(--t-base)/1.55 'IBM Plex Sans',system-ui,sans-serif;
   font-feature-settings:'tnum' 1; -webkit-font-smoothing:antialiased;
 }
-.wrap{max-width:600px;margin:0 auto;padding:0 var(--sp-4) 120px}
+.wrap{max-width:600px;margin:0 auto;padding:0 var(--sp-4) 120px;transition:max-width var(--dur) var(--ease)}
+body.wide .wrap{max-width:1440px}
+
+/* ---- DIT table (desktop-first) ---- */
+.dit{width:100%;border-collapse:separate;border-spacing:0;margin-top:var(--sp-4);
+  font-size:var(--t-sm);table-layout:fixed}
+.dit thead th{position:sticky;top:0;z-index:2;background:var(--surface-2);text-align:left;
+  font-size:var(--t-xs);font-weight:600;color:var(--ink-3);letter-spacing:.3px;text-transform:uppercase;
+  padding:var(--sp-2) var(--sp-3);border-bottom:1px solid var(--line-strong);white-space:nowrap}
+.dit tbody td{padding:var(--sp-2) var(--sp-3);border-bottom:1px solid var(--line);vertical-align:middle;
+  overflow:hidden;text-overflow:ellipsis}
+.dit tbody tr{cursor:pointer}
+@media (hover:hover){.dit tbody tr:hover td{background:var(--surface-2)}}
+.dit tbody tr:last-child td{border-bottom:0}
+.dit .grouphdr td{background:var(--surface);border-bottom:1px solid var(--line-strong);
+  font-weight:600;color:var(--ink-2);text-transform:none;letter-spacing:0;font-size:var(--t-sm);
+  padding-top:var(--sp-3);cursor:default}
+.dit .grouphdr td:hover{background:var(--surface)!important}
+
+/* column widths */
+.c-cam{width:120px} .c-name{width:auto} .c-card{width:74px} .c-type{width:96px}
+.c-status{width:132px} .c-clips{width:64px;text-align:right} .c-drive{width:130px}
+.c-person{width:130px} .c-notes{width:180px} .c-shot{width:64px;text-align:center}
+
+/* prominent camera label */
+.campill{display:inline-block;font-weight:700;font-size:var(--t-md);letter-spacing:-.2px;
+  padding:3px 10px;border-radius:var(--r-sm);background:var(--accent);color:#fff;white-space:nowrap}
+.campill.empty{background:var(--surface-2);color:var(--ink-3);border:1px dashed var(--line-strong);font-weight:600;font-size:var(--t-sm)}
+.rowname{font-weight:600;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cardtag{font-size:var(--t-xs);font-weight:700;background:var(--surface-2);border:1px solid var(--line);
+  color:var(--ink-2);padding:1px 6px;border-radius:4px;white-space:nowrap}
+
+/* camera type pills */
+.typ{font-weight:700;font-size:var(--t-xs);letter-spacing:.4px;padding:2px 8px;border-radius:var(--r-sm);white-space:nowrap}
+.typ-MAIN{background:var(--t-safe-bg);border:1px solid var(--t-safe-ln);color:var(--t-safe)}
+.typ-ACTION{background:var(--t-move-bg);border:1px solid var(--t-move-ln);color:var(--t-move)}
+.typ-AUDIO{background:var(--t-warm-bg);border:1px solid var(--t-warm-ln);color:var(--t-warm)}
+.typ-none{color:var(--ink-3);cursor:pointer}
+
+/* status cell as a button */
+.stbtn{width:100%;min-height:32px;border-radius:var(--r-sm);padding:4px 8px;font:700 var(--t-xs) inherit;
+  letter-spacing:.3px;cursor:pointer;border:1px solid;text-align:center;white-space:nowrap;
+  background:var(--pb);border-color:var(--pl);color:var(--pc)}
+@media (hover:hover){.stbtn:hover{filter:brightness(.96)}}
+
+.cellblank{color:var(--ink-3)}
+.cellwarn{color:var(--t-warm);font-weight:600}
+.shotthumb{width:40px;height:28px;object-fit:cover;border-radius:4px;border:1px solid var(--line);vertical-align:middle}
+.shotmiss{display:inline-block;width:40px;height:28px;border-radius:4px;border:1px dashed var(--line-strong);
+  color:var(--ink-3);font-size:15px;line-height:26px;text-align:center}
+
+/* row-count + filter bar above the table */
+.ditbar{display:flex;align-items:center;gap:var(--sp-3);flex-wrap:wrap;margin-top:var(--sp-4)}
+.ditbar .grow{flex:1}
+.ditsearch{min-height:36px;width:220px;max-width:100%;background:var(--surface);border:1px solid var(--line-strong);
+  color:var(--ink);border-radius:var(--r-sm);padding:6px var(--sp-3);font:400 var(--t-base) inherit}
+
+@media (max-width:820px){
+  body.wide .wrap{max-width:600px}
+  .dittable-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
+  .dit{min-width:1080px}
+}
 
 /* ---- focus: one ring, every interactive element ---- */
 :where(button,input,[tabindex]):focus{outline:none}
@@ -160,6 +222,8 @@ input:focus-visible{border-color:var(--accent);outline-offset:1px}
   padding:var(--sp-2) var(--sp-3);border-radius:var(--r-sm);font:500 var(--t-sm) inherit;cursor:pointer;
   transition:all var(--dur) var(--ease)}
 @media (hover:hover){.chip:hover{border-color:var(--accent);color:var(--accent);background:var(--accent-soft)}}
+
+.typechip.on{background:var(--accent);border-color:var(--accent);color:#fff}
 .chip[aria-pressed=true]{background:var(--accent-soft);border-color:var(--accent);color:var(--accent);font-weight:600}
 
 /* ---- quantity rows ---- */
@@ -759,6 +823,18 @@ const STAGES=[
   {k:'VERIFIED', label:'Verified',       tone:'safe', note:'Checksummed. Safe to wipe the card.'},
 ];
 const STAGE=k=>STAGES.find(x=>x.k===k)||STAGES[0];
+/* what a card must have before it can claim a given stage. Returns a
+   blocking message, or '' if it's allowed. This is the foolproof spine:
+   a card can't be called backed-up or verified unless the proof exists. */
+function stageNeeds(e,k){
+  const has=v=>!!String(e[v]||'').trim();
+  if(k==='ONE'      && !has('drive1')) return 'Set Drive 1 before marking a copy exists.';
+  if(k==='BACKING'  && !has('drive1')) return 'Set Drive 1 first.';
+  if(k==='TWO'      && !(has('drive1')&&has('drive2'))) return 'Needs both Drive 1 and Drive 2 to be a real backup.';
+  if(k==='VERIFIED' && !(has('drive1')&&has('drive2'))) return 'Can\'t verify without two drives filled in.';
+  if(k==='VERIFIED' && !has('verifier')) return 'Add who verified it before marking Verified.';
+  return '';
+}
 const stageIx=k=>Math.max(0,STAGES.findIndex(x=>x.k===k));
 const AT_RISK=['ACTIVE','HOT','INGESTING','ONE'];
 const sameProject=(a,b)=>String(a||'').trim().toLowerCase()===String(b||'').trim().toLowerCase();
@@ -803,6 +879,8 @@ const INTENTS={
             log:{act:'took',cards,project,who:taker}};
   },
   returnBatch(S,{bid}){
+    /* returning cards never touches the ingest log — those rows are the
+       permanent record of what happened to the footage. */
     const b=S.batches.find(x=>x.id===bid); if(!b) return {abort:'That batch was already returned.'};
     b.cards.forEach(c=>{ if(S.cards[c]) S.cards[c].batch=null });
     S.batches=S.batches.filter(x=>x.id!==bid);
@@ -892,20 +970,31 @@ const INTENTS={
     delete S.shoots[sid];
     return {msg:sh.project+' shoot day removed'};
   },
-  setStage(S,{eid,k}){
+  setStage(S,{eid,k,force}){
     const e=S.entries[eid]; if(!e) return {abort:'That row is gone.'};
+    if(!force){
+      const need=stageNeeds(e,k);
+      if(need) return {abort:need};
+    }
     e.status=k; e.updated=Date.now();
-    return {msg:e.label+' → '+STAGE(k).label};
+    return {msg:(e.cam||e.label||'Card')+' → '+STAGE(k).label};
   },
-  saveEntry(S,{eid,label,card,cam,shoot}){
+  saveEntry(S,{eid,f}){
+    const set=e=>{ e.label=f.label; e.card=f.card||null; e.cam=f.cam||''; e.type=f.type||'';
+      e.clips=f.clips||''; e.drive1=f.drive1||''; e.drive2=f.drive2||'';
+      e.ingestor=f.ingestor||''; e.verifier=f.verifier||''; e.notes=f.notes||'';
+      if(f.shot!==undefined) e.shot=f.shot||''; e.updated=Date.now();
+      if(f.card&&S.cards[f.card]) S.cards[f.card].cam=f.cam||''; };
     if(eid){ const e=S.entries[eid]; if(!e) return {abort:'That row is gone.'};
-      e.label=label; e.card=card||null; e.cam=cam||''; e.updated=Date.now();
-      if(card&&S.cards[card]) S.cards[card].cam=cam||'';
-      return {msg:'Saved'}; }
-    const id=newId();
-    S.entries[id]={id,shoot,label,card:card||null,cam:cam||'',status:'UNUSED',updated:Date.now()};
-    if(card&&S.cards[card]) S.cards[card].cam=cam||'';
-    return {msg:label+' added'};
+      set(e); return {msg:'Saved'}; }
+    const id=newId(); const e={id,shoot:f.shoot,status:'UNUSED'}; set(e);
+    S.entries[id]=e; return {msg:(f.label||f.cam||'Row')+' added'};
+  },
+  /* quick inline edit of a single field (drives, people, clips, notes, shot) */
+  setField(S,{eid,field,value}){
+    const e=S.entries[eid]; if(!e) return {abort:'That row is gone.'};
+    e[field]=value; e.updated=Date.now();
+    return {silent:true};
   },
   delEntry(S,{eid}){
     const e=S.entries[eid]; if(!e) return {abort:'Already gone.'};
@@ -1362,7 +1451,7 @@ function shootStats(sid){
 const recentProjects=()=>[...new Set(BATCHES.map(b=>b.project).filter(Boolean))].slice(0,8);
 
 /* Ingest → project → shoot day. PROJ null means we're at the top. */
-let PROJ=null;
+let PROJ=null, INGQ={};
 
 function projList(){
   const m={};
@@ -1394,6 +1483,7 @@ function renderIngest(){
 
 /* ---------- level 1: projects ---------- */
 function renderProjects(){
+  document.body.classList.remove('wide');
   const list=projList(), risk=list.reduce((n,p)=>n+p.risk,0);
   const nb=document.getElementById('newShootBtn'); nb.style.display=''; nb.textContent='+ New project';
   document.getElementById('shoots').innerHTML='';
@@ -1428,10 +1518,11 @@ function renderProjects(){
     : `<p class="empty"><b>No shoot days yet.</b>Start one and any cards already checked out to that project drop in automatically.</p>`;
 }
 function openProject(name){ PROJ=name; CUR=null; renderIngest(); window.scrollTo({top:0,behavior:'smooth'}); }
-function backToProjects(){ PROJ=null; CUR=null; renderIngest(); window.scrollTo({top:0,behavior:'smooth'}); }
+function backToProjects(){ PROJ=null; CUR=null; document.body.classList.remove('wide'); renderIngest(); window.scrollTo({top:0,behavior:'smooth'}); }
 
 /* ---------- level 2: shoot days in one project ---------- */
 function renderDays(){
+  document.body.classList.remove('wide');
   const days=daysOf(PROJ), risk=days.reduce((n,sh)=>n+shootStats(sh.id).risk,0);
   const nb=document.getElementById('newShootBtn'); nb.style.display=''; nb.textContent='+ New shoot day';
   document.getElementById('shoots').innerHTML='';
@@ -1464,6 +1555,7 @@ function renderDays(){
 /* ---------- level 3: one shoot day ---------- */
 function renderShoot(){
   const sh=SHOOTS[CUR], days=daysOf(sh.project);
+  document.body.classList.add('wide');
   document.getElementById('newShootBtn').style.display='none';
   document.getElementById('shoots').innerHTML = days.length>1
     ? days.map(d=>`<button class="sh" aria-pressed="${d.id===CUR}" onclick="pickShoot('${d.id}')">
@@ -1478,11 +1570,14 @@ function renderShoot(){
   const rows=entriesFor(CUR), total=rows.length;
   const verified=rows.filter(e=>e.status==='VERIFIED').length;
   const risky=rows.filter(e=>AT_RISK.includes(e.status));
+  const q=(INGQ[CUR]||'').toLowerCase();
+  const shown=q? rows.filter(e=>[e.cam,e.label,e.card,e.type,e.drive1,e.drive2,e.ingestor,e.verifier,e.notes]
+      .some(v=>String(v||'').toLowerCase().includes(q))) : rows;
 
   let safety='';
   if(total){
     if(risky.length) safety=`<div class="safety p-risk"><span class="big">${risky.length} ${risky.length===1?'card is':'cards are'} on a single copy</span>
-      <span class="sub">Nothing here is safe to wipe yet — ${esc(risky.slice(0,4).map(e=>e.label).join(', '))}${risky.length>4?' and '+(risky.length-4)+' more':''}.</span></div>`;
+      <span class="sub">Nothing here is safe to wipe yet — ${esc(risky.slice(0,4).map(e=>e.cam||e.label).join(', '))}${risky.length>4?' and '+(risky.length-4)+' more':''}.</span></div>`;
     else if(verified===total) safety=`<div class="safety p-safe"><span class="big">All ${total} verified</span>
       <span class="sub">Every card on this day is checksummed on two drives. Safe to wipe and put back on the wall.</span></div>`;
     else safety=`<div class="safety p-warm"><span class="big">${verified} of ${total} verified</span>
@@ -1496,22 +1591,67 @@ function renderShoot(){
     <div class="legend">${used.map(st=>
       `<div class="p-${st.tone}"><i style="background:var(--pc)"></i><b>${counts[st.k]}</b> ${st.label}</div>`).join('')}</div>`:'';
 
-  const grouped=[];
-  rows.forEach(e=>{ const st=STAGE(e.status);
-    if(!grouped.length||grouped[grouped.length-1].k!==st.k) grouped.push({k:st.k,label:st.label,items:[]});
-    grouped[grouped.length-1].items.push(e); });
-
   const head=`<div class="prow" style="padding:0;margin-top:var(--sp-4)">
     <button class="btn2" onclick="backToDays()">← ${esc(sh.project)}</button>
     <button class="btn2 sec" onclick="openShootMenu('${CUR}')">Edit shoot day</button></div>`;
 
-  document.getElementById('ingBody').innerHTML=head+safety+bar+(total
-    ? grouped.map(g=>`<div class="grp"><div class="grph">${g.label} · ${g.items.length}</div>
-        <div class="list">${g.items.map(ingRow).join('')}</div></div>`).join('')
-    : `<p class="empty"><b>Nothing logged for this day yet.</b>Cards checked out to ${esc(sh.project)} land here on their own. Add a row by hand for lavs, drones, and anything not on the wall.</p>`)
-    + `<button class="addbtn" onclick="openEntrySheet()">+ Add a row</button>`;
+  const bar2=`<div class="ditbar">
+    <input class="ditsearch" placeholder="Filter this day…" value="${esc(INGQ[CUR]||'')}"
+      oninput="INGQ['${CUR}']=this.value; clearTimeout(window._iq); window._iq=setTimeout(renderShoot,180)">
+    <span class="grow"></span>
+    <button class="btn2" onclick="openEntrySheet()">+ Add a row</button></div>`;
+
+  /* group by pipeline stage, dangerous first (STAGES is already ordered) */
+  const grouped=[];
+  shown.slice().sort((x,y)=>stageIx(x.status)-stageIx(y.status)||natural(x.cam||x.label,y.cam||y.label))
+    .forEach(e=>{ const st=STAGE(e.status);
+      if(!grouped.length||grouped[grouped.length-1].k!==st.k) grouped.push({k:st.k,label:st.label,tone:st.tone,items:[]});
+      grouped[grouped.length-1].items.push(e); });
+
+  const table = total ? `<div class="dittable-scroll"><table class="dit">
+    <thead><tr>
+      <th class="c-cam">Camera</th><th class="c-name">Name</th><th class="c-card">Card</th>
+      <th class="c-type">Type</th><th class="c-status">Status</th><th class="c-clips"># Clips</th>
+      <th class="c-drive">Drive 1</th><th class="c-drive">Drive 2</th>
+      <th class="c-person">Ingestor</th><th class="c-person">Verifier</th>
+      <th class="c-notes">Notes</th><th class="c-shot">Shot</th>
+    </tr></thead><tbody>
+    ${grouped.map(g=>`<tr class="grouphdr"><td colspan="12">${g.label} · ${g.items.length}</td></tr>
+      ${g.items.map(ditRow).join('')}`).join('')}
+    </tbody></table></div>`
+    : `<p class="empty"><b>Nothing logged for this day yet.</b>Cards checked out to ${esc(sh.project)} land here on their own. Add a row by hand for lavs, drones, and anything not on the wall.</p>`;
+
+  document.getElementById('ingBody').innerHTML = head+safety+bar+bar2+table;
 }
-function backToDays(){ CUR=null; renderIngest(); window.scrollTo({top:0,behavior:'smooth'}); }
+
+/* one table row = one card's full ingest record */
+function ditRow(e){
+  const st=STAGE(e.status), blank='<span class="cellblank">—</span>';
+  const cam = e.cam ? `<span class="campill">${esc(e.cam)}</span>`
+                    : `<span class="campill empty">set cam</span>`;
+  const typ = e.type ? `<span class="typ typ-${e.type}">${esc(e.type)}</span>`
+                     : `<span class="typ typ-none">—</span>`;
+  const drive1 = e.drive1 ? esc(e.drive1) : (AT_RISK.includes(e.status)?'<span class="cellblank">—</span>':`<span class="cellwarn">missing</span>`);
+  const shot = e.shot
+    ? `<img class="shotthumb" src="${esc(e.shot)}" alt="verification screenshot">`
+    : `<span class="shotmiss">+</span>`;
+  return `<tr onclick="openEntrySheet('${e.id}')">
+    <td class="c-cam">${cam}</td>
+    <td class="c-name"><span class="rowname">${esc(e.label||'—')}</span></td>
+    <td class="c-card">${e.card?`<span class="cardtag">${esc(e.card)}</span>`:blank}</td>
+    <td class="c-type">${typ}</td>
+    <td class="c-status"><button class="stbtn p-${st.tone}" onclick="event.stopPropagation();openStageSheet('${e.id}')">${esc(st.label)}</button></td>
+    <td class="c-clips">${e.clips?esc(e.clips):blank}</td>
+    <td class="c-drive" title="${esc(e.drive1||'')}">${drive1}</td>
+    <td class="c-drive" title="${esc(e.drive2||'')}">${e.drive2?esc(e.drive2):blank}</td>
+    <td class="c-person" title="${esc(e.ingestor||'')}">${e.ingestor?esc(e.ingestor):blank}</td>
+    <td class="c-person" title="${esc(e.verifier||'')}">${e.verifier?esc(e.verifier):blank}</td>
+    <td class="c-notes" title="${esc(e.notes||'')}">${e.notes?esc(e.notes):blank}</td>
+    <td class="c-shot">${shot}</td>
+  </tr>`;
+}
+
+function backToDays(){ CUR=null; document.body.classList.remove('wide'); renderIngest(); window.scrollTo({top:0,behavior:'smooth'}); }
 function pickShoot(id){ CUR=id; renderIngest(); window.scrollTo({top:0,behavior:'smooth'}); }
 
 function ingRow(e){
@@ -1529,45 +1669,132 @@ function ingRow(e){
 function openStageSheet(eid){
   const e=ENTRIES[eid]; if(!e) return;
   const next=STAGES[stageIx(e.status)+1];
+  const nextBlocked=next?stageNeeds(e,next.k):'';
   document.getElementById('sheetIn').innerHTML=`
-    <h2 class="sid" style="margin:0">${esc(e.label)}</h2>
+    <h2 class="sid" style="margin:0">${esc(e.cam||e.label)}</h2>
     <p class="sst">${e.card?'Card '+esc(e.card)+' · ':''}${esc(STAGE(e.status).note)}</p>
-    <div class="sact">
-      ${next?`<button class="good" onclick="setStage('${eid}','${next.k}')">Move to ${esc(next.label)} →</button>`:''}
-      ${STAGES.map(st=>`<button onclick="setStage('${eid}','${st.k}')">${esc(st.label)}${st.k===e.status?'  ✓':''}</button>`).join('')}
+    ${next?(nextBlocked
+      ? `<div class="safety p-warm" style="margin-top:var(--sp-3)"><span class="sub">${esc(nextBlocked)}</span></div>
+         <div class="sact"><button class="good" onclick="closeSheet();openEntrySheet('${eid}')">Fill it in →</button>`
+      : `<div class="sact"><button class="good" onclick="setStage('${eid}','${next.k}')">Move to ${esc(next.label)} →</button>`)
+      : '<div class="sact">'}
+      ${STAGES.map(st=>{ const blk=stageNeeds(e,st.k);
+        return `<button ${blk?'style="opacity:.55"':''} onclick="setStage('${eid}','${st.k}')">${esc(st.label)}${
+          st.k===e.status?'  ✓':blk?'  🔒':''}</button>`;}).join('')}
       <button onclick="closeSheet()">Cancel</button></div>`;
   sheet.showModal();
 }
 function setStage(eid,k){ closeSheet(); apply('setStage',{eid,k}); }
 
 /* --- row sheet --- */
+function diUnique(field){ return [...new Set(Object.values(ENTRIES).map(e=>e[field]).filter(Boolean))]; }
+function chipRow(id,vals){
+  if(!vals.length) return '';
+  return `<div class="chips">${vals.slice(0,10).map(v=>
+    `<button type="button" class="chip" onclick="document.getElementById('${id}').value=${JSON.stringify(v)}">${esc(v)}</button>`).join('')}</div>`;
+}
+
 function openEntrySheet(eid){
-  const e=eid?ENTRIES[eid]:null, cams=camList();
+  const e=eid?ENTRIES[eid]:null;
+  const g=x=>e&&e[x]?e[x]:'';
+  const drives=[...new Set([...diUnique('drive1'),...diUnique('drive2')])];
+  const people=[...new Set([...diUnique('ingestor'),...diUnique('verifier'),ME])];
+  const cams=[...new Set([...diUnique('cam'),...camList()])];
+  const shotHtml = g('shot')
+    ? `<img src="${esc(g('shot'))}" style="width:100%;max-height:180px;object-fit:contain;border:1px solid var(--line);border-radius:var(--r-sm);background:var(--surface-2)">
+       <button type="button" class="chip" style="margin-top:var(--sp-2)" onclick="clearShot('${eid}')">Remove screenshot</button>`
+    : `<div class="cellblank" style="font-size:var(--t-sm)">No screenshot yet.</div>`;
+
   document.getElementById('sheetIn').innerHTML=`
-    <h2 class="sid" style="margin:0">${e?'Edit row':'Add a row'}</h2>
-    <p class="sst">${e?'':'For lavs, drones, or anything that is not a card on the wall.'}</p>
+    <h2 class="sid" style="margin:0">${e?(g('cam')||g('label')||'Edit row'):'Add a row'}</h2>
+    <p class="sst">${e?(g('card')?'Card '+esc(g('card')):'No wall card'):'Log a camera, card, drives and who handled it.'}</p>
+
+    <div class="sfield"><label class="lbl" for="ecam">Camera label</label>
+      <input type="text" id="ecam" placeholder="A CAM" value="${esc(g('cam'))}" autocomplete="off"></div>
+    <div class="chips">${['A CAM','B CAM','C CAM','D CAM'].map(c=>
+      `<button type="button" class="chip" onclick="document.getElementById('ecam').value='${c}'">${c}</button>`).join('')}</div>
+    ${chipRow('ecam',cams)}
+
     <div class="sfield"><label class="lbl" for="elabel">Name</label>
-      <input type="text" id="elabel" placeholder="FX3-C CHAD" value="${esc(e?e.label:'')}" autocomplete="off"></div>
-    <div class="sfield"><label class="lbl" for="ecam">Camera</label>
-      <input type="text" id="ecam" placeholder="A cam" value="${esc(e&&e.cam?e.cam:'')}" autocomplete="off"></div>
-    ${cams.length?`<div class="chips">${cams.slice(0,8).map(c=>
-      `<button class="chip" onclick="document.getElementById('ecam').value='${esc(c)}'">${esc(c)}</button>`).join('')}</div>`:''}
-    <div class="sfield"><label class="lbl" for="ecard">Card on the wall (optional)</label>
-      <input type="text" id="ecard" placeholder="CF-3" value="${esc(e&&e.card?e.card:'')}" autocomplete="off" autocapitalize="characters"></div>
+      <input type="text" id="elabel" placeholder="FX3-C CHAD" value="${esc(g('label'))}" autocomplete="off"></div>
+
+    <div class="sfield"><label class="lbl">Type</label>
+      <div class="chips" id="etypeRow">${['MAIN','ACTION','AUDIO'].map(tp=>
+        `<button type="button" class="chip typechip ${g('type')===tp?'on':''}" data-t="${tp}" onclick="pickType('${tp}')">${tp}</button>`).join('')}</div>
+      <input type="hidden" id="etype" value="${esc(g('type'))}"></div>
+
+    <div class="sfield"><label class="lbl" for="ecard">Card on the wall</label>
+      <input type="text" id="ecard" placeholder="CF-3" value="${esc(g('card'))}" autocomplete="off" autocapitalize="characters"></div>
+
+    <div class="sfield"><label class="lbl" for="eclips"># of clips</label>
+      <input type="text" id="eclips" inputmode="numeric" placeholder="31" value="${esc(g('clips'))}" autocomplete="off"></div>
+
+    <div class="sfield"><label class="lbl" for="edrive1">Drive 1</label>
+      <input type="text" id="edrive1" placeholder="2026-ACT-01" value="${esc(g('drive1'))}" autocomplete="off"></div>
+    ${chipRow('edrive1',drives)}
+    <div class="sfield"><label class="lbl" for="edrive2">Drive 2</label>
+      <input type="text" id="edrive2" placeholder="Derek's Mac" value="${esc(g('drive2'))}" autocomplete="off"></div>
+    ${chipRow('edrive2',drives)}
+
+    <div class="sfield"><label class="lbl" for="eingestor">Ingestor</label>
+      <input type="text" id="eingestor" placeholder="${esc(ME)}" value="${esc(g('ingestor'))}" autocomplete="off"></div>
+    ${chipRow('eingestor',people)}
+    <div class="sfield"><label class="lbl" for="everifier">Verifier</label>
+      <input type="text" id="everifier" placeholder="Kaleb McEwen" value="${esc(g('verifier'))}" autocomplete="off"></div>
+    ${chipRow('everifier',people)}
+
+    <div class="sfield"><label class="lbl" for="enotes">Notes</label>
+      <input type="text" id="enotes" placeholder="Wasn't in spare case" value="${esc(g('notes'))}" autocomplete="off"></div>
+
+    <div class="sfield"><label class="lbl">Verification screenshot</label>
+      ${shotHtml}
+      <input type="file" id="eshotfile" accept="image/*" style="display:none" onchange="uploadShot('${eid||''}',this)">
+      <button type="button" class="chip" style="margin-top:var(--sp-2)" onclick="document.getElementById('eshotfile').click()">
+        ${g('shot')?'Replace photo':'Upload photo'}</button>
+      <span id="shotStatus" class="cellblank" style="font-size:var(--t-sm);margin-left:var(--sp-2)"></span></div>
+
     <div class="sact">
       <button class="good" onclick="saveEntry('${eid||''}')">${e?'Save':'Add row'}</button>
       ${e?`<button class="danger" onclick="delEntry('${eid}')">Remove this row</button>`:''}
       <button onclick="closeSheet()">Cancel</button></div>`;
   sheet.showModal();
-  document.getElementById('elabel').focus();
+  document.getElementById('ecam').focus();
+}
+function pickType(t){
+  const cur=document.getElementById('etype').value===t?'':t;
+  document.getElementById('etype').value=cur;
+  document.querySelectorAll('.typechip').forEach(b=>b.classList.toggle('on',b.dataset.t===cur));
 }
 function saveEntry(eid){
-  const label=document.getElementById('elabel').value.trim();
-  const cam=document.getElementById('ecam').value.trim();
-  const card=document.getElementById('ecard').value.trim().toUpperCase();
-  if(!label){ toast('Give the row a name'); return; }
-  closeSheet(); apply('saveEntry',{eid:eid||null,label,card,cam,shoot:CUR});
+  const val=id=>document.getElementById(id).value.trim();
+  const f={ shoot:CUR, cam:val('ecam'), label:val('elabel')||val('ecam'),
+    type:document.getElementById('etype').value, card:val('ecard').toUpperCase(),
+    clips:val('eclips'), drive1:val('edrive1'), drive2:val('edrive2'),
+    ingestor:val('eingestor'), verifier:val('everifier'), notes:val('enotes') };
+  if(!f.cam && !f.label && !f.card){ toast('Give it a camera label, name, or card'); return; }
+  closeSheet(); apply('saveEntry',{eid:eid||null,f});
 }
+
+/* --- screenshot upload: Firebase Storage live, data-URL in the demo --- */
+async function uploadShot(eid,input){
+  const file=input.files&&input.files[0]; if(!file) return;
+  const st=document.getElementById('shotStatus'); if(st){ st.textContent='Uploading…'; }
+  try{
+    let url;
+    if(DB && window.firebase && firebase.storage){
+      const ref=firebase.storage().ref('ingest_shots/'+(eid||newId())+'_'+Date.now()+'.jpg');
+      await ref.put(file);
+      url=await ref.getDownloadURL();
+    } else {
+      url=await new Promise(r=>{ const fr=new FileReader(); fr.onload=()=>r(fr.result); fr.readAsDataURL(file); });
+    }
+    if(eid) apply('setField',{eid,field:'shot',value:url});
+    if(st){ st.textContent='Uploaded ✓'; }
+    if(eid) setTimeout(()=>{ if(sheet.open) openEntrySheet(eid); },300);
+  }catch(err){ if(st){ st.textContent='Upload failed'; } toast('Screenshot upload failed'); }
+}
+function clearShot(eid){ if(eid){ apply('setField',{eid,field:'shot',value:''}); setTimeout(()=>{if(sheet.open)openEntrySheet(eid);},200);} }
+
 function delEntry(eid){ closeSheet(); apply('delEntry',{eid}); }
 
 /* --- new shoot day --- */

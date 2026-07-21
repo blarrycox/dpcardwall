@@ -10,6 +10,7 @@
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
 <style>
 /* ============================================================
    TOKENS
@@ -241,6 +242,29 @@ input:focus-visible{border-color:var(--accent);outline-offset:1px}
 .slot:active{transform:none}
 
 /* ---- missing rows ---- */
+.sync{font-size:var(--t-xs);font-weight:600;padding:3px var(--sp-2);border-radius:var(--r-sm);
+  white-space:nowrap;border:1px solid transparent}
+.sync.off{background:var(--out-bg);border-color:var(--out-line);color:var(--out)}
+.sync.on{display:none}
+
+/* ---- collapsible section ---- */
+.disc{margin-top:var(--sp-6)}
+.disc summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:var(--sp-2);
+  min-height:var(--tap);padding:var(--sp-3) var(--sp-4);background:var(--surface);
+  border:1px solid var(--line);border-radius:var(--r);transition:background var(--dur) var(--ease)}
+.disc summary::-webkit-details-marker{display:none}
+.disc summary::marker{content:''}
+.disc summary:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+@media (hover:hover){.disc summary:hover{background:var(--surface-2)}}
+.disc .dt{font-size:var(--t-md);font-weight:600;letter-spacing:-.15px}
+.disc .dn{background:var(--gone-bg);border:1px solid var(--gone-line);color:var(--gone);
+  padding:1px var(--sp-2);border-radius:var(--r-sm);font-size:var(--t-sm);font-weight:700}
+.disc .dhint{margin-left:auto;font-size:var(--t-sm);color:var(--ink-3)}
+.disc .dchev{color:var(--ink-3);transition:transform var(--dur) var(--ease);font-size:var(--t-sm)}
+.disc[open] .dchev{transform:rotate(180deg)}
+.disc[open] summary{border-radius:var(--r) var(--r) 0 0;border-bottom:0}
+.disc .list{border-radius:0 0 var(--r) var(--r)}
+
 /* ---- inventory management ---- */
 .slot.addslot{border:1px dashed var(--line-strong);background:none;color:var(--ink-3);font-weight:600}
 @media (hover:hover){.slot.addslot:hover{border-color:var(--accent);color:var(--accent);background:var(--accent-soft)}}
@@ -349,6 +373,7 @@ dialog.sheet[open]::backdrop{animation:fade 240ms var(--ease)}
 
 <header><div class="hrow">
   <span class="mark">Card Wall</span>
+  <span class="sync on" id="sync">Offline</span>
   <span class="who" id="who"></span>
   <button id="signoutBtn" onclick="doSignOut()">Sign out</button>
 </div></header>
@@ -374,7 +399,7 @@ dialog.sheet[open]::backdrop{animation:fade 240ms var(--ease)}
     <div class="stats">
       <div class="stat"><b id="sWall">0</b><span>On wall</span></div>
       <div class="stat o"><b id="sOut">0</b><span>Out</span></div>
-      <button class="stat g" onclick="jump('missSec')"><b id="sMiss">0</b><span>Missing</span></button>
+      <button class="stat g" onclick="showMissing()"><b id="sMiss">0</b><span>Missing</span></button>
       <div class="stat"><b id="sBatch">0</b><span>Batches</span></div>
     </div>
 
@@ -479,7 +504,7 @@ function showApp(){
   ME=(_user&&(_user.displayName||_user.email))||'\u2014';
   document.getElementById('signoutBtn').textContent='Sign out ('+(_user&&_user.email?_user.email.split('@')[0]:'')+')';
   document.getElementById('taker').value=ME;
-  go('home');
+  connect();
 }
 function doSignIn(){
   if(!_auth) return;
@@ -507,7 +532,7 @@ function gateInit(){
 /* ============================================================
    INVENTORY
    ============================================================ */
-let GROUPS=[
+const RAILS=[
  {key:'CF', name:'CF', desc:'CFexpress',   pad:0,n:16},
  {key:'TUF',name:'TUF',desc:'Tough SD',    pad:0,n:7},
  {key:'GLD',name:'GLD',desc:'Gold SD',     pad:0,n:10},
@@ -527,9 +552,8 @@ const id=(g,i)=>g.key+'-'+(g.pad?String(i).padStart(g.pad,'0'):i);
 let ME='\u2014';
 const RECENT=['SAVBAN ASG','Bananas ASG','Overtime','Squad Games','Can We Score'];
 
-let CARDS={};
-GROUPS.forEach(g=>{for(let i=1;i<=g.n;i++)CARDS[id(g,i)]={group:g.key,batch:null,missing:false,why:'',since:''}});
-let BATCHES=[], seq=1, SEL=new Set(), OPEN=new Set(), triageId=null, triagePick=new Set(), lastUndo=null;
+let GROUPS=[], CARDS={}, BATCHES=[];
+let SEL=new Set(), OPEN=new Set(), MISSOPEN=false, triageId=null, triagePick=new Set(), lastUndo=null;
 
 const avail=k=>Object.keys(CARDS).filter(c=>CARDS[c].group===k&&!CARDS[c].batch&&!CARDS[c].missing);
 const missingIn=k=>Object.keys(CARDS).filter(c=>CARDS[c].group===k&&CARDS[c].missing);
@@ -539,8 +563,11 @@ const natural=(a,b)=>{const na=+a.replace(/\D/g,''),nb=+b.replace(/\D/g,'');
   return a.replace(/[\d-]/g,'').localeCompare(b.replace(/[\d-]/g,''))||na-nb};
 
 const snapshot=()=>({cards:structuredClone(CARDS),batches:structuredClone(BATCHES),
-  groups:structuredClone(GROUPS),seq});
-function restore(s){CARDS=s.cards;BATCHES=s.batches;GROUPS=s.groups;seq=s.seq;render()}
+  groups:structuredClone(GROUPS)});
+function restore(s){
+  CARDS=s.cards;BATCHES=s.batches;GROUPS=s.groups;
+  if(DB) DB.set(toDb()); else render();
+}
 
 /* SEL is the single source of truth for a checkout. The stepper and the
    card grid are two editors of the same set, never two modes. */
@@ -562,60 +589,146 @@ function asRange(cards){
 }
 
 /* ---------- mutations ---------- */
-function flagMissing(cid,why){
-  const before=snapshot(), c=CARDS[cid]; if(!c)return;
-  c.missing=true; c.why=why||'Not in its slot'; c.since=today();
-  if(c.batch){
-    const b=BATCHES.find(x=>x.id===c.batch);
-    if(b){b.cards=b.cards.filter(x=>x!==cid); if(!b.cards.length)BATCHES=BATCHES.filter(x=>x.id!==b.id)}
-    c.batch=null;
-  }
-  toast(cid+' flagged missing',before);
-}
-function unflag(cid){
-  const before=snapshot(), c=CARDS[cid]; if(!c)return;
-  c.missing=false; c.why=''; c.since='';
-  toast(cid+' is back on the wall',before);
-}
-
 /* ============================================================
-   INVENTORY MANAGEMENT
-   New cards get the next free number on their rail. Removal is
-   undoable rather than confirmed, and refuses to touch a card
-   somebody currently has.
+   PERSISTENCE
+
+   One small document at /cardwall holds the whole wall. Every
+   change is a named intent replayed against whatever the server
+   currently has, inside a transaction — so if two people check
+   cards out at the same instant, both succeed and neither
+   overwrites the other.
+
+   DB === null means local-only (the preview build).
    ============================================================ */
-const cardsIn=k=>Object.keys(CARDS).filter(c=>CARDS[c].group===k).sort(natural);
-const nextNum=k=>cardsIn(k).reduce((m,c)=>Math.max(m,+c.replace(/\D/g,'')),0)+1;
+let DB=null, ONLINE=false, BOOTED=false;
 
-function addCards(k,count){
-  const before=snapshot(), g=GROUPS.find(x=>x.key===k); if(!g||count<1)return;
-  const start=nextNum(k), made=[];
-  for(let i=0;i<count;i++){
-    const cid=id(g,start+i);
-    CARDS[cid]={group:k,batch:null,missing:false,why:'',since:''};
-    made.push(cid);
-  }
-  toast(made.length===1?made[0]+' added to the wall'
-    :made.length+' cards added · '+made[0]+' → '+made[made.length-1],before);
+const toDb  =()=>({cards:CARDS,batches:BATCHES,groups:GROUPS});
+function fromDb(d){
+  CARDS  = d.cards  || {};
+  BATCHES= d.batches|| [];
+  GROUPS = d.groups || [];
+  Object.values(CARDS).forEach(c=>{ c.batch=c.batch||null; c.missing=!!c.missing;
+    c.why=c.why||''; c.since=c.since||''; });
+  BATCHES.forEach(b=>{ b.cards=b.cards||[]; });
 }
 
-function removeCard(cid){
-  const c=CARDS[cid]; if(!c)return;
-  if(c.batch){ toast(cid+' is checked out — return it first'); return; }
-  const before=snapshot(), k=c.group;
-  delete CARDS[cid]; SEL.delete(cid);
-  if(!cardsIn(k).length){ GROUPS=GROUPS.filter(g=>g.key!==k); OPEN.delete(k); }
-  toast(cid+' removed from the wall',before);
+/* a brand-new wall: every card present, nothing out, nothing missing */
+function freshWall(){
+  const cards={};
+  RAILS.forEach(g=>{ for(let i=1;i<=g.n;i++) cards[id(g,i)]={group:g.key,batch:null,missing:false,why:'',since:''} });
+  return {cards,batches:[],groups:RAILS.map(({key,name,desc,pad})=>({key,name,desc,pad}))};
 }
 
-function addRail(code,name,count){
+const newId=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+
+/* every mutation lives here, as a function of state → message (or false to abort) */
+const INTENTS={
+  checkout(S,{project,taker,date,cards}){
+    const taken=cards.filter(c=>!S.cards[c]||S.cards[c].batch||S.cards[c].missing);
+    if(taken.length) return {abort:'Someone just took '+taken.slice(0,3).join(', ')+
+      (taken.length>3?' and others':'')+'. Pick again.'};
+    const b={id:newId(),project,taker,date,cards};
+    cards.forEach(c=>S.cards[c].batch=b.id);
+    S.batches.unshift(b);
+    return {msg:cards.length+' cards checked out'};
+  },
+  returnBatch(S,{bid}){
+    const b=S.batches.find(x=>x.id===bid); if(!b) return {abort:'That batch was already returned.'};
+    b.cards.forEach(c=>{ if(S.cards[c]) S.cards[c].batch=null });
+    S.batches=S.batches.filter(x=>x.id!==bid);
+    return {msg:b.cards.length+' cards back on the wall'};
+  },
+  triage(S,{bid,gone}){
+    const b=S.batches.find(x=>x.id===bid); if(!b) return {abort:'That batch was already returned.'};
+    const back=b.cards.filter(c=>!gone.includes(c));
+    back.forEach(c=>{ if(S.cards[c]) S.cards[c].batch=null });
+    gone.forEach(c=>{ if(S.cards[c]){ S.cards[c].batch=null; S.cards[c].missing=true;
+      S.cards[c].why="Didn't come back from "+b.project; S.cards[c].since=today(); }});
+    S.batches=S.batches.filter(x=>x.id!==bid);
+    return {msg:gone.length?back.length+' back · '+gone.length+' flagged missing'
+                           :back.length+' cards back on the wall'};
+  },
+  oneBack(S,{cid}){
+    const c=S.cards[cid]; if(!c||!c.batch) return {abort:cid+' is already on the wall.'};
+    const b=S.batches.find(x=>x.id===c.batch);
+    if(b){ b.cards=b.cards.filter(x=>x!==cid); if(!b.cards.length) S.batches=S.batches.filter(x=>x.id!==b.id); }
+    c.batch=null;
+    return {msg:cid+' is back on the wall'};
+  },
+  flag(S,{cid,why}){
+    const c=S.cards[cid]; if(!c) return {abort:cid+' is no longer on the wall.'};
+    c.missing=true; c.why=why||'Not in its slot'; c.since=today();
+    if(c.batch){
+      const b=S.batches.find(x=>x.id===c.batch);
+      if(b){ b.cards=b.cards.filter(x=>x!==cid); if(!b.cards.length) S.batches=S.batches.filter(x=>x.id!==b.id); }
+      c.batch=null;
+    }
+    return {msg:cid+' flagged missing'};
+  },
+  unflag(S,{cid}){
+    const c=S.cards[cid]; if(!c) return {abort:cid+' is no longer on the wall.'};
+    c.missing=false; c.why=''; c.since='';
+    return {msg:cid+' is back on the wall'};
+  },
+  addCards(S,{k,count}){
+    const g=S.groups.find(x=>x.key===k); if(!g||count<1) return {abort:'That rail is gone.'};
+    const start=Object.keys(S.cards).filter(c=>S.cards[c].group===k)
+      .reduce((m,c)=>Math.max(m,+c.replace(/\D/g,'')),0)+1;
+    const made=[];
+    for(let i=0;i<count;i++){ const cid=id(g,start+i);
+      S.cards[cid]={group:k,batch:null,missing:false,why:'',since:''}; made.push(cid); }
+    return {msg:made.length===1?made[0]+' added to the wall'
+      :made.length+' cards added · '+made[0]+' → '+made[made.length-1]};
+  },
+  removeCard(S,{cid}){
+    const c=S.cards[cid]; if(!c) return {abort:cid+' is already gone.'};
+    if(c.batch) return {abort:cid+' is checked out — return it first'};
+    const k=c.group; delete S.cards[cid];
+    if(!Object.keys(S.cards).some(x=>S.cards[x].group===k)) S.groups=S.groups.filter(g=>g.key!==k);
+    return {msg:cid+' removed from the wall'};
+  },
+  addRail(S,{code,name,count}){
+    const k=code.trim().toUpperCase();
+    if(S.groups.some(g=>g.key===k)) return {abort:'There is already a '+k+' rail.'};
+    const g={key:k,name:k,desc:(name||'').trim()||'cards',pad:0};
+    S.groups.push(g);
+    for(let i=1;i<=count;i++) S.cards[id(g,i)]={group:k,batch:null,missing:false,why:'',since:''};
+    return {msg:k+' rail created with '+count+' card'+(count>1?'s':'')};
+  },
+};
+
+/* run an intent: against the server inside a transaction, or locally in preview */
+function apply(name,payload){
   const before=snapshot();
-  const k=code.trim().toUpperCase();
-  GROUPS.push({key:k,name:k,desc:name.trim()||'cards',pad:0,n:0});
-  const g=GROUPS[GROUPS.length-1];
-  for(let i=1;i<=count;i++) CARDS[id(g,i)]={group:k,batch:null,missing:false,why:'',since:''};
-  toast(k+' rail created with '+count+' card'+(count>1?'s':''),before);
+  if(!DB){
+    const S={cards:CARDS,batches:BATCHES,groups:GROUPS};
+    const r=INTENTS[name](S,payload);
+    if(r.abort){ toast(r.abort); return; }
+    CARDS=S.cards; BATCHES=S.batches; GROUPS=S.groups;
+    toast(r.msg,before); return;
+  }
+  let aborted=null;
+  DB.transaction(cur=>{
+    const S=cur&&cur.cards?structuredClone(cur):freshWall();
+    S.batches=S.batches||[]; S.groups=S.groups||[];
+    const r=INTENTS[name](S,payload);
+    if(r.abort){ aborted=r.abort; return; }
+    aborted=null; window.__msg=r.msg;
+    return S;
+  },(err,committed)=>{
+    if(err){ toast('Could not save — check your connection'); return; }
+    if(!committed){ toast(aborted||'Someone changed that first'); return; }
+    toast(window.__msg,before);
+  });
 }
+
+/* thin wrappers so the UI keeps calling the same names */
+const flagMissing =(cid,why)=>apply('flag',{cid,why});
+const unflag      =cid=>apply('unflag',{cid});
+const oneBack     =cid=>{closeSheet(); apply('oneBack',{cid});};
+const addCards    =(k,count)=>apply('addCards',{k,count});
+const removeCard  =cid=>apply('removeCard',{cid});
+const addRail     =(code,name,count)=>apply('addRail',{code,name,count});
 
 function railCodeError(code){
   const k=(code||'').trim().toUpperCase();
@@ -636,6 +749,7 @@ function go(v){
   window.scrollTo(0,0); render();
 }
 function jump(e){document.getElementById(e).scrollIntoView({behavior:'smooth',block:'start'})}
+function showMissing(){ if(!allMissing().length)return; MISSOPEN=true; renderHome(); jump('missSec'); }
 
 function render(){
   document.getElementById('who').textContent=String(ME).split(' ')[0]+' · '+fmt(today());
@@ -654,13 +768,19 @@ function renderHome(){
     tot+' cards across '+GROUPS.length+' rails'+(miss?' · '+miss+' unaccounted for':'');
 
   document.getElementById('missSec').innerHTML=miss?`
-    <h2>Unaccounted for<span class="c bad">${miss}</span></h2>
+    <details class="disc" id="missDisc" ${MISSOPEN?'open':''} ontoggle="MISSOPEN=this.open">
+    <summary>
+      <span class="dt">Unaccounted for</span>
+      <span class="dn">${miss}</span>
+      <span class="dhint">${MISSOPEN?'Hide':'Show'}</span>
+      <span class="dchev" aria-hidden="true">▾</span>
+    </summary>
     <div class="list">${allMissing().map(c=>`
       <div class="mrow">
         <span class="mi">${c}</span>
         <span class="mm">${esc(CARDS[c].why)}<s>Flagged ${fmt(CARDS[c].since)}</s></span>
         <button onclick="unflag('${c}')">Found it</button>
-      </div>`).join('')}</div>`:'';
+      </div>`).join('')}</div></details>`:'';
 
   document.getElementById('outList').innerHTML=BATCHES.length
     ?BATCHES.map(b=>batchHTML(b,false)).join('')
@@ -690,8 +810,8 @@ function batchHTML(b,btn){
     </div>
     <div class="ids">${chipsFor(b.cards)}</div>
     ${btn?`<div class="brow">
-      <button class="btn2" onclick="ret(${b.id})">All ${b.cards.length} came back</button>
-      <button class="btn2 sec" onclick="triage(${b.id})">Some didn't</button></div>`:''}
+      <button class="btn2" onclick="ret('${b.id}')">All ${b.cards.length} came back</button>
+      <button class="btn2 sec" onclick="triage('${b.id}')">Some didn't</button></div>`:''}
   </article>`;
 }
 function chipsFor(cards){
@@ -795,14 +915,7 @@ function renderReturn(){
     ?BATCHES.map(b=>batchHTML(b,true)).join('')
     :`<p class="empty"><b>Nothing is checked out.</b>Once someone takes a batch, you'll be able to return it from here in one tap.</p>`;
 }
-function ret(bid){
-  const before=snapshot(), b=BATCHES.find(x=>x.id===bid); if(!b)return;
-  const n=b.cards.length;
-  b.cards.forEach(c=>CARDS[c].batch=null);
-  BATCHES=BATCHES.filter(x=>x.id!==bid);
-  go(BATCHES.length?'return':'home');
-  toast(n+' cards back on the wall',before);
-}
+function ret(bid){ go(BATCHES.length>1?'return':'home'); apply('returnBatch',{bid}); }
 
 /* ---------- triage ---------- */
 function triage(bid){triageId=bid;triagePick=new Set();go('triage')}
@@ -816,14 +929,8 @@ function renderTriage(){
 }
 function tog(c){triagePick.has(c)?triagePick.delete(c):triagePick.add(c);renderTriage();renderBar()}
 function commitTriage(){
-  const before=snapshot(), b=BATCHES.find(x=>x.id===triageId); if(!b)return;
-  const gone=[...triagePick], back=b.cards.filter(c=>!triagePick.has(c));
-  back.forEach(c=>CARDS[c].batch=null);
-  gone.forEach(c=>{CARDS[c].batch=null;CARDS[c].missing=true;
-    CARDS[c].why="Didn't come back from "+b.project;CARDS[c].since=today()});
-  BATCHES=BATCHES.filter(x=>x.id!==b.id);
-  go('home');
-  toast(gone.length?`${back.length} back · ${gone.length} flagged missing`:`${back.length} cards back on the wall`,before);
+  const bid=triageId, gone=[...triagePick];
+  go('home'); apply('triage',{bid,gone});
 }
 
 /* ---------- submit ---------- */
@@ -831,21 +938,20 @@ function submit(){
   const project=document.getElementById('pj').value.trim();
   const taker=document.getElementById('taker').value.trim()||ME;
   const date=document.getElementById('dt').value||today();
-  const a=assign(); if(!project||!a.length)return;
-  const cards=a.flatMap(x=>x.cards);
-  const b={id:seq++,project,taker,date,cards};
-  cards.forEach(c=>CARDS[c].batch=b.id);
-  BATCHES.unshift(b);
+  const cards=assign().flatMap(x=>x.cards);
+  if(!project||!cards.length)return;
+  const shown=assign();
   document.getElementById('doneSub').textContent=`${cards.length} cards · ${project} · ${fmt(date)}`;
-  document.getElementById('doneIds').innerHTML=a.map(x=>{
+  document.getElementById('doneIds').innerHTML=shown.map(x=>{
     const r=asRange(x.cards);
     return `<div class="agrp"><div class="lab">${x.g.name}</div>
     ${r?`<div class="rng xl">${r}</div>`:`<div class="ids">${x.cards.map(c=>`<span class="cid rng">${c}</span>`).join('')}</div>`}</div>`;
   }).join('');
-  SEL=new Set(); OPEN=new Set(); go('done');
+  SEL=new Set(); OPEN=new Set();
+  go('done');
+  apply('checkout',{project,taker,date,cards});
 }
 
-/* ---------- sheet ---------- */
 const sheet=document.getElementById('sheet');
 function openSheet(cid){
   const c=CARDS[cid], b=c.batch?BATCHES.find(x=>x.id===c.batch):null;
@@ -941,11 +1047,7 @@ function doAddRail(){
 
 function closeSheet(){sheet.close();render()}
 sheet.addEventListener('click',e=>{if(e.target===sheet)closeSheet()});
-function oneBack(cid){
-  const before=snapshot(), c=CARDS[cid], b=BATCHES.find(x=>x.id===c.batch);
-  if(b){b.cards=b.cards.filter(x=>x!==cid); if(!b.cards.length)BATCHES=BATCHES.filter(x=>x.id!==b.id)}
-  c.batch=null; closeSheet(); toast(cid+' is back on the wall',before);
-}
+
 
 /* ---------- action bar ---------- */
 function renderBar(){
@@ -991,16 +1093,31 @@ document.getElementById('dt').value=today();
 document.getElementById('pj').addEventListener('input',()=>{renderBar()});
 document.getElementById('pj').addEventListener('blur',renderTake);
 
-(function seed(){
-  [['SAVBAN ASG',{L:10,P:6}],['Overtime',{CF:3}]].forEach(([p,d])=>{
-    const cards=Object.entries(d).flatMap(([k,n])=>avail(k).sort(natural).slice(0,n));
-    const b={id:seq++,project:p,taker:'Blaise Larry-Cox',date:today(),cards};
-    cards.forEach(c=>CARDS[c].batch=b.id); BATCHES.unshift(b);
+/* Opens the shared wall once you're signed in, and keeps this browser
+   in step with every other one. */
+function connect(){
+  if(DB) return;
+  DB=firebase.database().ref('cardwall');
+
+  firebase.database().ref('.info/connected').on('value',snap=>{
+    ONLINE=!!snap.val();
+    const el=document.getElementById('sync');
+    el.className='sync '+(ONLINE?'on':'off');
+    el.textContent=ONLINE?'':'Offline — will sync when you reconnect';
   });
-  [['CF-10','Not in its slot'],['GLD-5','Not in its slot']].forEach(([c,w])=>{
-    CARDS[c].missing=true; CARDS[c].why=w; CARDS[c].since=today();
+
+  DB.on('value',snap=>{
+    const v=snap.val();
+    if(!v||!v.cards){                     // first ever run: lay out a full wall
+      DB.transaction(cur=>(cur&&cur.cards)?undefined:freshWall());
+      return;
+    }
+    fromDb(structuredClone(v));
+    if(!BOOTED){ BOOTED=true; go('home'); } else render();
+  },err=>{
+    toast("Can't reach the wall — "+((err&&err.message)||'connection problem'));
   });
-})();
+}
 
 gateInit();
 </script>

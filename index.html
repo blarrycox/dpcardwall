@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#f7f8f9">
-<title>Card Wall — Dude Perfect</title>
+<title>Media Tools — Dude Perfect</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -242,6 +242,63 @@ input:focus-visible{border-color:var(--accent);outline-offset:1px}
 .slot:active{transform:none}
 
 /* ---- missing rows ---- */
+/* ---- top tabs ---- */
+.tabs{display:flex;gap:2px;background:var(--surface-2);padding:3px;border-radius:var(--r);border:1px solid var(--line)}
+.tabs button{min-height:34px;padding:0 var(--sp-3);background:none;border:0;border-radius:var(--r-sm);
+  color:var(--ink-3);font:600 var(--t-sm) inherit;cursor:pointer;white-space:nowrap;transition:all var(--dur) var(--ease)}
+@media (hover:hover){.tabs button:hover{color:var(--ink)}}
+.tabs button[aria-selected=true]{background:var(--surface);color:var(--ink)}
+
+/* ---- ingest pipeline ---- */
+.p-idle{--pc:oklch(48% 0.01 250); --pb:oklch(96% 0.003 250); --pl:oklch(88% 0.005 250)}
+.p-risk{--pc:oklch(48% 0.17 25);  --pb:oklch(95.5% 0.03 25); --pl:oklch(86% 0.07 25)}
+.p-warm{--pc:oklch(46% 0.11 70);  --pb:oklch(95.5% 0.045 75);--pl:oklch(85% 0.08 75)}
+.p-move{--pc:oklch(47% 0.13 258); --pb:oklch(95.5% 0.035 258);--pl:oklch(86% 0.06 258)}
+.p-near{--pc:oklch(48% 0.10 195); --pb:oklch(95.5% 0.035 195);--pl:oklch(86% 0.06 195)}
+.p-safe{--pc:oklch(45% 0.12 155); --pb:oklch(95.5% 0.035 155);--pl:oklch(85% 0.06 155)}
+
+.shoots{display:flex;gap:var(--sp-2);overflow-x:auto;padding:var(--sp-1) 0 var(--sp-2);
+  margin-top:var(--sp-4);scrollbar-width:none}
+.shoots::-webkit-scrollbar{display:none}
+.sh{flex:0 0 auto;min-height:var(--tap);background:var(--surface);border:1px solid var(--line);
+  color:var(--ink-2);border-radius:var(--r);padding:var(--sp-2) var(--sp-3);cursor:pointer;
+  font:inherit;text-align:left;transition:all var(--dur) var(--ease)}
+.sh .p{display:block;font-size:var(--t-base);font-weight:600;letter-spacing:-.1px;white-space:nowrap}
+.sh .d{display:block;font-size:var(--t-xs);color:var(--ink-3);margin-top:1px;white-space:nowrap}
+.sh[aria-pressed=true]{background:var(--accent);border-color:var(--accent);color:#fff}
+.sh[aria-pressed=true] .d{color:color-mix(in oklab,#fff 78%,var(--accent))}
+@media (hover:hover){.sh:hover:not([aria-pressed=true]){border-color:var(--line-strong)}}
+.sh.new{border-style:dashed;color:var(--ink-3);display:flex;align-items:center;padding:var(--sp-2) var(--sp-4)}
+
+.safety{margin-top:var(--sp-4);border-radius:var(--r);padding:var(--sp-4);
+  border:1px solid var(--pl);background:var(--pb);color:var(--pc)}
+.safety .big{font-size:var(--t-lg);font-weight:700;letter-spacing:-.3px;display:block}
+.safety .sub{font-size:var(--t-sm);margin-top:var(--sp-1);opacity:.92;text-wrap:pretty}
+.bar2{display:flex;height:8px;border-radius:99px;overflow:hidden;margin-top:var(--sp-4);background:var(--surface-2)}
+.legend{display:flex;flex-wrap:wrap;gap:var(--sp-2) var(--sp-4);margin-top:var(--sp-3)}
+.legend div{font-size:var(--t-sm);color:var(--ink-2);display:flex;align-items:center;gap:6px}
+.legend i{width:9px;height:9px;border-radius:3px;display:block}
+.legend b{font-weight:600;color:var(--ink)}
+
+.erow{display:flex;align-items:center;gap:var(--sp-3);padding:var(--sp-3) 0;border-bottom:1px solid var(--line)}
+.erow:last-child{border-bottom:0}
+.ename{flex:1;min-width:0;background:none;border:0;padding:0;font:inherit;color:inherit;text-align:left;cursor:pointer}
+.ename .n{font-size:var(--t-base);font-weight:600;letter-spacing:-.1px;overflow:hidden;
+  text-overflow:ellipsis;white-space:nowrap}
+.ename .m{font-size:var(--t-sm);color:var(--ink-3);margin-top:1px;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.st{flex:0 0 auto;min-height:36px;border-radius:var(--r-sm);padding:var(--sp-2) var(--sp-3);
+  font:600 var(--t-sm) inherit;cursor:pointer;white-space:nowrap;
+  background:var(--pb);border:1px solid var(--pl);color:var(--pc)}
+@media (hover:hover){.st:hover{filter:brightness(.96)}}
+.addbtn{width:100%;min-height:var(--tap);margin-top:var(--sp-2);background:none;
+  border:1px dashed var(--line-strong);border-radius:var(--r);color:var(--ink-2);
+  font:600 var(--t-base) inherit;cursor:pointer}
+@media (hover:hover){.addbtn:hover{border-color:var(--accent);color:var(--accent);background:var(--accent-soft)}}
+.camchip{font-size:var(--t-xs);font-weight:700;background:var(--accent-soft);border:1px solid var(--accent);
+  color:var(--accent);padding:1px 6px;border-radius:4px}
+.grp{margin-top:var(--sp-5)}
+.grph{font-size:var(--t-sm);font-weight:600;color:var(--ink-3);margin-bottom:var(--sp-2)}
+
 /* ---- history ---- */
 .logday{font-size:var(--t-sm);font-weight:600;color:var(--ink-3);margin:var(--sp-5) 0 var(--sp-2)}
 .logday:first-child{margin-top:0}
@@ -393,7 +450,10 @@ dialog.sheet[open]::backdrop{animation:fade 240ms var(--ease)}
 <div id="app">
 
 <header><div class="hrow">
-  <span class="mark">Card Wall</span>
+  <div class="tabs" role="tablist">
+    <button role="tab" id="tab-wall"   aria-selected="true"  onclick="go('home')">Card Wall</button>
+    <button role="tab" id="tab-ingest" aria-selected="false" onclick="go('ingest')">Ingest</button>
+  </div>
   <span class="sync on" id="sync">Offline</span>
   <span class="who" id="who"></span>
   <button id="signoutBtn" onclick="doSignOut()">Sign out</button>
@@ -477,6 +537,13 @@ dialog.sheet[open]::backdrop{animation:fade 240ms var(--ease)}
   </section>
 
   <!-- TRIAGE -->
+  <section id="v-ingest" class="hide">
+    <h1 id="ingTitle">Ingest</h1>
+    <p class="lede" id="ingLede"></p>
+    <div class="shoots" id="shoots"></div>
+    <div id="ingBody"></div>
+  </section>
+
   <section id="v-log" class="hide">
     <button class="back" onclick="go('home')">← The wall</button>
     <h1>History</h1>
@@ -581,7 +648,7 @@ const id=(g,i)=>g.key+'-'+(g.pad?String(i).padStart(g.pad,'0'):i);
 let ME='\u2014';
 const RECENT=['SAVBAN ASG','Bananas ASG','Overtime','Squad Games','Can We Score'];
 
-let GROUPS=[], CARDS={}, BATCHES=[], LOG=[];
+let GROUPS=[], CARDS={}, BATCHES=[], LOG=[], SHOOTS={}, ENTRIES={}, CUR=null;
 let SEL=new Set(), OPEN=new Set(), MISSOPEN=false, triageId=null, triagePick=new Set(), lastUndo=null;
 
 const avail=k=>Object.keys(CARDS).filter(c=>CARDS[c].group===k&&!CARDS[c].batch&&!CARDS[c].missing);
@@ -592,9 +659,11 @@ const natural=(a,b)=>{const na=+a.replace(/\D/g,''),nb=+b.replace(/\D/g,'');
   return a.replace(/[\d-]/g,'').localeCompare(b.replace(/[\d-]/g,''))||na-nb};
 
 const snapshot=()=>({cards:structuredClone(CARDS),batches:structuredClone(BATCHES),
-  groups:structuredClone(GROUPS),log:structuredClone(LOG)});
+  groups:structuredClone(GROUPS),log:structuredClone(LOG),
+  shoots:structuredClone(SHOOTS),entries:structuredClone(ENTRIES)});
 function restore(s){
   CARDS=s.cards;BATCHES=s.batches;GROUPS=s.groups;LOG=s.log||[];
+  SHOOTS=s.shoots||{};ENTRIES=s.entries||{};
   if(DB) DB.set(toDb()); else render();
 }
 
@@ -631,27 +700,77 @@ function asRange(cards){
    ============================================================ */
 let DB=null, ONLINE=false, BOOTED=false;
 
-const toDb  =()=>({cards:CARDS,batches:BATCHES,groups:GROUPS,log:LOG});
+const toDb  =()=>({cards:CARDS,batches:BATCHES,groups:GROUPS,log:LOG,shoots:SHOOTS,entries:ENTRIES});
 function fromDb(d){
   CARDS  = d.cards  || {};
   BATCHES= d.batches|| [];
   GROUPS = d.groups || [];
   LOG    = d.log    || [];
+  SHOOTS = d.shoots || {};
+  ENTRIES= d.entries|| {};
   Object.values(CARDS).forEach(c=>{ c.batch=c.batch||null; c.missing=!!c.missing;
-    c.why=c.why||''; c.since=c.since||''; });
+    c.why=c.why||''; c.since=c.since||''; c.cam=c.cam||''; });
   BATCHES.forEach(b=>{ b.cards=b.cards||[]; });
 }
 
 /* a brand-new wall: every card present, nothing out, nothing missing */
 function freshWall(){
   const cards={};
-  RAILS.forEach(g=>{ for(let i=1;i<=g.n;i++) cards[id(g,i)]={group:g.key,batch:null,missing:false,why:'',since:''} });
-  return {cards,batches:[],groups:RAILS.map(({key,name,desc,pad})=>({key,name,desc,pad})),log:[]};
+  RAILS.forEach(g=>{ for(let i=1;i<=g.n;i++) cards[id(g,i)]={group:g.key,batch:null,missing:false,why:'',since:'',cam:''} });
+  return {cards,batches:[],groups:RAILS.map(({key,name,desc,pad})=>({key,name,desc,pad})),log:[],shoots:{},entries:{}};
 }
 
 const newId=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,6);
 
 /* every mutation lives here, as a function of state → message (or false to abort) */
+/* ============================================================
+   INGEST PIPELINE
+   Ordered from "this footage exists in exactly one place" to
+   "safe to wipe the card".
+   ============================================================ */
+const STAGES=[
+  {k:'UNUSED',   label:'Unused',         tone:'idle', note:'Never rolled on'},
+  {k:'SPARE',    label:'Spare',          tone:'idle', note:'Backup card, not in a camera'},
+  {k:'ACTIVE',   label:'Active (in cam)',tone:'risk', note:'Rolling. Footage exists in one place.'},
+  {k:'HOT',      label:'Hot (w/ DIT)',   tone:'risk', note:'Off the camera, not copied yet.'},
+  {k:'INGESTING',label:'Ingesting',      tone:'warm', note:'Copy in progress.'},
+  {k:'ONE',      label:'1 drive',        tone:'warm', note:'One copy exists. Do not wipe.'},
+  {k:'BACKING',  label:'Backing up',     tone:'move', note:'Second copy in progress.'},
+  {k:'TWO',      label:'2 drives',       tone:'near', note:'Two copies. Not checksummed yet.'},
+  {k:'VERIFIED', label:'Verified',       tone:'safe', note:'Checksummed. Safe to wipe the card.'},
+];
+const STAGE=k=>STAGES.find(x=>x.k===k)||STAGES[0];
+const stageIx=k=>Math.max(0,STAGES.findIndex(x=>x.k===k));
+const AT_RISK=['ACTIVE','HOT','INGESTING','ONE'];
+const sameProject=(a,b)=>String(a||'').trim().toLowerCase()===String(b||'').trim().toLowerCase();
+
+/* Cards checked out to a project appear in that project's shoot day
+   automatically — no button, no retyping. Runs inside the same
+   transaction as the checkout, so it can never half-happen. */
+function syncShoot(S,shootId){
+  const sh=S.shoots[shootId]; if(!sh) return 0;
+  const have=new Set(Object.values(S.entries).filter(e=>e.shoot===shootId).map(e=>e.card).filter(Boolean));
+  let n=0;
+  (S.batches||[]).forEach(b=>{
+    if(!sameProject(b.project,sh.project)) return;
+    (b.cards||[]).forEach(c=>{
+      if(have.has(c)) return;
+      have.add(c); n++;
+      const eid=newId(), cam=(S.cards[c]&&S.cards[c].cam)||'';
+      S.entries[eid]={id:eid,shoot:shootId,card:c,cam,
+        label:cam?cam:(c+(b.taker?' — '+String(b.taker).split(' ')[0]:'')),
+        status:'UNUSED',updated:Date.now()};
+    });
+  });
+  return n;
+}
+/* after a checkout, feed every open shoot day for that project */
+function syncAllShoots(S,project){
+  let n=0;
+  Object.keys(S.shoots).forEach(id=>{ if(sameProject(S.shoots[id].project,project)) n+=syncShoot(S,id); });
+  return n;
+}
+
 const INTENTS={
   checkout(S,{project,taker,date,cards}){
     const taken=cards.filter(c=>!S.cards[c]||S.cards[c].batch||S.cards[c].missing);
@@ -660,7 +779,8 @@ const INTENTS={
     const b={id:newId(),project,taker,date,cards};
     cards.forEach(c=>S.cards[c].batch=b.id);
     S.batches.unshift(b);
-    return {msg:cards.length+' cards checked out',
+    const fed=syncAllShoots(S,project);
+    return {msg:cards.length+' cards checked out'+(fed?' · '+fed+' added to the ingest log':''),
             log:{act:'took',cards,project,who:taker}};
   },
   returnBatch(S,{bid}){
@@ -714,7 +834,7 @@ const INTENTS={
       .reduce((m,c)=>Math.max(m,+c.replace(/\D/g,'')),0)+1;
     const made=[];
     for(let i=0;i<count;i++){ const cid=id(g,start+i);
-      S.cards[cid]={group:k,batch:null,missing:false,why:'',since:''}; made.push(cid); }
+      S.cards[cid]={group:k,batch:null,missing:false,why:'',since:'',cam:''}; made.push(cid); }
     return {msg:made.length===1?made[0]+' added to the wall'
       :made.length+' cards added · '+made[0]+' → '+made[made.length-1],
       log:{act:'added',cards:made}};
@@ -726,6 +846,46 @@ const INTENTS={
     if(!Object.keys(S.cards).some(x=>S.cards[x].group===k)) S.groups=S.groups.filter(g=>g.key!==k);
     return {msg:cid+' removed from the wall',log:{act:'removed',cards:[cid]}};
   },
+  setCam(S,{cid,cam}){
+    const c=S.cards[cid]; if(!c) return {abort:cid+' is no longer on the wall.'};
+    c.cam=cam||'';
+    Object.values(S.entries).forEach(e=>{ if(e.card===cid){ e.cam=c.cam; if(c.cam) e.label=c.cam; } });
+    return {msg:cam?cid+' is in '+cam:'Camera cleared for '+cid,
+            log:{act:'cam',cards:[cid],note:cam||'no camera'}};
+  },
+  newShoot(S,{project,day,date}){
+    const sid=newId();
+    S.shoots[sid]={id:sid,project,day,date,created:Date.now()};
+    const n=syncShoot(S,sid);
+    return {msg:project+' created'+(n?' · '+n+' cards pulled in':''),newShoot:sid,
+            log:{act:'shoot',cards:[],note:project+(day?' · '+day:'')}};
+  },
+  delShoot(S,{sid}){
+    const sh=S.shoots[sid]; if(!sh) return {abort:'Already gone.'};
+    Object.keys(S.entries).forEach(k=>{ if(S.entries[k].shoot===sid) delete S.entries[k]; });
+    delete S.shoots[sid];
+    return {msg:sh.project+' shoot day removed'};
+  },
+  setStage(S,{eid,k}){
+    const e=S.entries[eid]; if(!e) return {abort:'That row is gone.'};
+    e.status=k; e.updated=Date.now();
+    return {msg:e.label+' → '+STAGE(k).label};
+  },
+  saveEntry(S,{eid,label,card,cam,shoot}){
+    if(eid){ const e=S.entries[eid]; if(!e) return {abort:'That row is gone.'};
+      e.label=label; e.card=card||null; e.cam=cam||''; e.updated=Date.now();
+      if(card&&S.cards[card]) S.cards[card].cam=cam||'';
+      return {msg:'Saved'}; }
+    const id=newId();
+    S.entries[id]={id,shoot,label,card:card||null,cam:cam||'',status:'UNUSED',updated:Date.now()};
+    if(card&&S.cards[card]) S.cards[card].cam=cam||'';
+    return {msg:label+' added'};
+  },
+  delEntry(S,{eid}){
+    const e=S.entries[eid]; if(!e) return {abort:'Already gone.'};
+    const l=e.label; delete S.entries[eid];
+    return {msg:l+' removed'};
+  },
   addRail(S,{code,name,count}){
     const k=code.trim().toUpperCase();
     if(S.groups.some(g=>g.key===k)) return {abort:'There is already a '+k+' rail.'};
@@ -733,7 +893,7 @@ const INTENTS={
     S.groups.push(g);
     const made=[];
     for(let i=1;i<=count;i++){ const cid=id(g,i);
-      S.cards[cid]={group:k,batch:null,missing:false,why:'',since:''}; made.push(cid); }
+      S.cards[cid]={group:k,batch:null,missing:false,why:'',since:'',cam:''}; made.push(cid); }
     return {msg:k+' rail created with '+count+' card'+(count>1?'s':''),
             log:{act:'rail',cards:made,note:k+' · '+g.desc}};
   },
@@ -751,25 +911,29 @@ function writeLog(S,entry){
 function apply(name,payload){
   const before=snapshot();
   if(!DB){
-    const S={cards:CARDS,batches:BATCHES,groups:GROUPS,log:LOG};
+    const S={cards:CARDS,batches:BATCHES,groups:GROUPS,log:LOG,shoots:SHOOTS,entries:ENTRIES};
     const r=INTENTS[name](S,payload);
     if(r.abort){ toast(r.abort); return; }
     writeLog(S,r.log);
+    if(r.newShoot) CUR=r.newShoot;
     CARDS=S.cards; BATCHES=S.batches; GROUPS=S.groups; LOG=S.log;
+    SHOOTS=S.shoots; ENTRIES=S.entries;
     toast(r.msg,before); return;
   }
   let aborted=null;
   DB.transaction(cur=>{
     const S=cur&&cur.cards?structuredClone(cur):freshWall();
     S.batches=S.batches||[]; S.groups=S.groups||[]; S.log=S.log||[];
+    S.shoots=S.shoots||{}; S.entries=S.entries||{};
     const r=INTENTS[name](S,payload);
     if(r.abort){ aborted=r.abort; return; }
     writeLog(S,r.log);
-    aborted=null; window.__msg=r.msg;
+    aborted=null; window.__msg=r.msg; if(r.newShoot) window.__newShoot=r.newShoot;
     return S;
   },(err,committed)=>{
     if(err){ toast('Could not save — check your connection'); return; }
     if(!committed){ toast(aborted||'Someone changed that first'); return; }
+    if(window.__newShoot){ CUR=window.__newShoot; window.__newShoot=null; }
     toast(window.__msg,before);
   });
 }
@@ -794,7 +958,7 @@ function railCodeError(code){
    ROUTING
    ============================================================ */
 let view='home';
-const VIEWS=['home','take','done','return','triage','log'];
+const VIEWS=['home','take','done','return','triage','log','ingest'];
 function go(v){
   view=v;
   VIEWS.forEach(x=>document.getElementById('v-'+x).classList.toggle('hide',x!==v));
@@ -805,7 +969,10 @@ function showMissing(){ if(!allMissing().length)return; MISSOPEN=true; renderHom
 
 function render(){
   document.getElementById('who').textContent=String(ME).split(' ')[0]+' · '+fmt(today());
-  ({home:renderHome,take:renderTake,return:renderReturn,triage:renderTriage,log:renderLog}[view]||(()=>{}))();
+  document.getElementById('tab-wall').setAttribute('aria-selected',String(view!=='ingest'));
+  document.getElementById('tab-ingest').setAttribute('aria-selected',String(view==='ingest'));
+  ({home:renderHome,take:renderTake,return:renderReturn,triage:renderTriage,
+    log:renderLog,ingest:renderIngest}[view]||(()=>{}))();
   renderBar();
 }
 
@@ -857,7 +1024,9 @@ function renderHome(){
 function batchHTML(b,btn){
   return `<article class="batch">
     <div class="btop">
-      <div><div class="pj">${esc(b.project)}</div><div class="sb">${esc(b.taker)} · ${fmt(b.date)}</div></div>
+      <div><div class="pj">${esc(b.project)}</div><div class="sb">${esc(b.taker)} · ${fmt(b.date)}${
+        (()=>{const cams=[...new Set(b.cards.map(c=>CARDS[c]&&CARDS[c].cam).filter(Boolean))];
+              return cams.length?' · '+cams.join(', '):'';})()}</div></div>
       <div class="pill">${b.cards.length} out</div>
     </div>
     <div class="ids">${chipsFor(b.cards)}</div>
@@ -1008,13 +1177,14 @@ const sheet=document.getElementById('sheet');
 function openSheet(cid){
   const c=CARDS[cid], b=c.batch?BATCHES.find(x=>x.id===c.batch):null;
   let st,acts;
+  const camBtn=`<button onclick="openCamSheet('${cid}')">${c.cam?'Camera: '+esc(c.cam):'Set the camera it\'s in'}</button>`;
   const drop=`<button class="danger" onclick="removeCard('${cid}');closeSheet()">Remove ${cid} from the wall</button>`;
   if(c.missing){
     st=`<b class="gone">Missing.</b> ${esc(c.why)}. Flagged ${fmt(c.since)}.`;
     acts=`<button class="good" onclick="unflag('${cid}');closeSheet()">Found it, back on the wall</button>`+drop;
   }else if(b){
-    st=`<b class="out">Checked out.</b> ${esc(b.project)} — ${esc(b.taker)}, ${fmt(b.date)}. Return it before removing it.`;
-    acts=`<button class="good" onclick="oneBack('${cid}')">Back on the wall</button>
+    st=`<b class="out">Checked out.</b> ${esc(b.project)} — ${esc(b.taker)}, ${fmt(b.date)}.${c.cam?' In <b>'+esc(c.cam)+'</b>.':''}`;
+    acts=camBtn+`<button class="good" onclick="oneBack('${cid}')">Back on the wall</button>
           <button class="danger" onclick="flagMissing('${cid}','Never came back from ${esc(b.project)}');closeSheet()">Flag missing</button>`;
   }else{
     st=`<b class="ok">On the wall.</b> Nobody has it checked out.`;
@@ -1102,6 +1272,28 @@ function doAddRail(){
   addRail(code,name,_sq); closeSheet();
 }
 
+function openCamSheet(cid){
+  const c=CARDS[cid], cams=camList();
+  document.getElementById('sheetIn').innerHTML=`
+    <h2 class="sid" style="margin:0">${cid}</h2>
+    <p class="sst">Which camera is this card in? It carries through to the ingest log.</p>
+    <div class="sfield"><label class="lbl" for="camv">Camera</label>
+      <input type="text" id="camv" placeholder="A cam" value="${esc(c.cam||'')}" autocomplete="off"></div>
+    ${cams.length?`<div class="chips">${cams.slice(0,10).map(x=>
+      `<button class="chip" onclick="document.getElementById('camv').value='${esc(x)}'">${esc(x)}</button>`).join('')}</div>`:''}
+    <div class="chips">${['A cam','B cam','C cam','D cam','Drone','Spare'].map(x=>
+      `<button class="chip" onclick="document.getElementById('camv').value='${x}'">${x}</button>`).join('')}</div>
+    <div class="sact">
+      <button class="good" onclick="saveCam('${cid}')">Save</button>
+      <button onclick="closeSheet()">Cancel</button></div>`;
+  sheet.showModal();
+  document.getElementById('camv').focus();
+}
+function saveCam(cid){
+  const cam=document.getElementById('camv').value.trim();
+  closeSheet(); apply('setCam',{cid,cam});
+}
+
 function closeSheet(){sheet.close();render()}
 sheet.addEventListener('click',e=>{if(e.target===sheet)closeSheet()});
 
@@ -1126,11 +1318,163 @@ function renderBar(){
 
 /* ---------- utils ---------- */
 /* ============================================================
+   INGEST VIEW
+   ============================================================ */
+const shootList =()=>Object.values(SHOOTS).sort((a,b)=>(b.date||'').localeCompare(a.date||'')||(b.created||0)-(a.created||0));
+const entriesFor=id=>Object.values(ENTRIES).filter(e=>e.shoot===id)
+  .sort((a,b)=>stageIx(a.status)-stageIx(b.status)||natural(a.card||a.label,b.card||b.label));
+const camList=()=>[...new Set(Object.values(CARDS).map(c=>c.cam).filter(Boolean))].sort();
+
+function renderIngest(){
+  const list=shootList();
+  if(CUR&&!SHOOTS[CUR]) CUR=null;
+  if(!CUR&&list.length) CUR=list[0].id;
+
+  document.getElementById('shoots').innerHTML=
+    list.map(sh=>`<button class="sh" aria-pressed="${sh.id===CUR}" onclick="pickShoot('${sh.id}')">
+      <span class="p">${esc(sh.project)}</span>
+      <span class="d">${esc(sh.day||'')}${sh.day?' · ':''}${fmt(sh.date)}</span></button>`).join('')
+    +`<button class="sh new" onclick="openShootSheet()">+ New shoot day</button>`;
+
+  const el=document.getElementById('ingBody'), sh=CUR?SHOOTS[CUR]:null;
+  if(!sh){
+    document.getElementById('ingTitle').textContent='Ingest';
+    document.getElementById('ingLede').textContent='Track every card from the camera to a verified backup.';
+    el.innerHTML=`<p class="empty"><b>No shoot days yet.</b>Start one and any cards already checked out to that project drop in automatically.</p>`;
+    return;
+  }
+  document.getElementById('ingTitle').textContent=sh.project;
+  document.getElementById('ingLede').textContent=
+    (sh.day?sh.day+' · ':'')+new Date(sh.date+'T12:00').toLocaleDateString(undefined,{weekday:'long',month:'long',day:'numeric'});
+
+  const rows=entriesFor(CUR), total=rows.length;
+  const verified=rows.filter(e=>e.status==='VERIFIED').length;
+  const risky=rows.filter(e=>AT_RISK.includes(e.status));
+
+  let safety='';
+  if(total){
+    if(risky.length) safety=`<div class="safety p-risk"><span class="big">${risky.length} ${risky.length===1?'card is':'cards are'} on a single copy</span>
+      <span class="sub">Nothing here is safe to wipe yet — ${esc(risky.slice(0,4).map(e=>e.label).join(', '))}${risky.length>4?' and '+(risky.length-4)+' more':''}.</span></div>`;
+    else if(verified===total) safety=`<div class="safety p-safe"><span class="big">All ${total} verified</span>
+      <span class="sub">Every card on this shoot is checksummed on two drives. Safe to wipe and put back on the wall.</span></div>`;
+    else safety=`<div class="safety p-warm"><span class="big">${verified} of ${total} verified</span>
+      <span class="sub">The rest are copied but not checksummed. Don't wipe anything until it reads Verified.</span></div>`;
+  }
+
+  const counts={}; rows.forEach(e=>counts[e.status]=(counts[e.status]||0)+1);
+  const used=STAGES.filter(st=>counts[st.k]);
+  const bar=total?`<div class="bar2">${used.map(st=>
+      `<span class="p-${st.tone}" style="width:${counts[st.k]/total*100}%;background:var(--pc)"></span>`).join('')}</div>
+    <div class="legend">${used.map(st=>
+      `<div class="p-${st.tone}"><i style="background:var(--pc)"></i><b>${counts[st.k]}</b> ${st.label}</div>`).join('')}</div>`:'';
+
+  const grouped=[];
+  rows.forEach(e=>{ const st=STAGE(e.status);
+    if(!grouped.length||grouped[grouped.length-1].k!==st.k) grouped.push({k:st.k,label:st.label,items:[]});
+    grouped[grouped.length-1].items.push(e); });
+
+  el.innerHTML=safety+bar+(total
+    ? grouped.map(g=>`<div class="grp"><div class="grph">${g.label} · ${g.items.length}</div>
+        <div class="list">${g.items.map(ingRow).join('')}</div></div>`).join('')
+    : `<p class="empty"><b>Nothing logged for this day yet.</b>Cards checked out to ${esc(sh.project)} land here on their own. Add a row by hand for lavs, drones, and anything not on the wall.</p>`)
+    + `<button class="addbtn" onclick="openEntrySheet()">+ Add a row</button>`
+    + `<p class="note">Cards checked out to ${esc(sh.project)} arrive here automatically.</p>`;
+}
+function pickShoot(id){ CUR=id; renderIngest(); window.scrollTo({top:0,behavior:'smooth'}); }
+
+function ingRow(e){
+  const st=STAGE(e.status);
+  return `<div class="erow">
+    <button class="ename" onclick="openEntrySheet('${e.id}')">
+      <span class="n">${esc(e.label)}</span>
+      <span class="m">${e.card?`<span class="cid">${esc(e.card)}</span>`:''}${
+        e.cam&&e.cam!==e.label?`<span class="camchip">${esc(e.cam)}</span>`:''}${esc(st.note)}</span>
+    </button>
+    <button class="st p-${st.tone}" onclick="openStageSheet('${e.id}')">${esc(st.label)}</button></div>`;
+}
+
+/* --- stage sheet --- */
+function openStageSheet(eid){
+  const e=ENTRIES[eid]; if(!e) return;
+  const next=STAGES[stageIx(e.status)+1];
+  document.getElementById('sheetIn').innerHTML=`
+    <h2 class="sid" style="margin:0">${esc(e.label)}</h2>
+    <p class="sst">${e.card?'Card '+esc(e.card)+' · ':''}${esc(STAGE(e.status).note)}</p>
+    <div class="sact">
+      ${next?`<button class="good" onclick="setStage('${eid}','${next.k}')">Move to ${esc(next.label)} →</button>`:''}
+      ${STAGES.map(st=>`<button onclick="setStage('${eid}','${st.k}')">${esc(st.label)}${st.k===e.status?'  ✓':''}</button>`).join('')}
+      <button onclick="closeSheet()">Cancel</button></div>`;
+  sheet.showModal();
+}
+function setStage(eid,k){ closeSheet(); apply('setStage',{eid,k}); }
+
+/* --- row sheet --- */
+function openEntrySheet(eid){
+  const e=eid?ENTRIES[eid]:null, cams=camList();
+  document.getElementById('sheetIn').innerHTML=`
+    <h2 class="sid" style="margin:0">${e?'Edit row':'Add a row'}</h2>
+    <p class="sst">${e?'':'For lavs, drones, or anything that is not a card on the wall.'}</p>
+    <div class="sfield"><label class="lbl" for="elabel">Name</label>
+      <input type="text" id="elabel" placeholder="FX3-C CHAD" value="${esc(e?e.label:'')}" autocomplete="off"></div>
+    <div class="sfield"><label class="lbl" for="ecam">Camera</label>
+      <input type="text" id="ecam" placeholder="A cam" value="${esc(e&&e.cam?e.cam:'')}" autocomplete="off"></div>
+    ${cams.length?`<div class="chips">${cams.slice(0,8).map(c=>
+      `<button class="chip" onclick="document.getElementById('ecam').value='${esc(c)}'">${esc(c)}</button>`).join('')}</div>`:''}
+    <div class="sfield"><label class="lbl" for="ecard">Card on the wall (optional)</label>
+      <input type="text" id="ecard" placeholder="CF-3" value="${esc(e&&e.card?e.card:'')}" autocomplete="off" autocapitalize="characters"></div>
+    <div class="sact">
+      <button class="good" onclick="saveEntry('${eid||''}')">${e?'Save':'Add row'}</button>
+      ${e?`<button class="danger" onclick="delEntry('${eid}')">Remove this row</button>`:''}
+      <button onclick="closeSheet()">Cancel</button></div>`;
+  sheet.showModal();
+  document.getElementById('elabel').focus();
+}
+function saveEntry(eid){
+  const label=document.getElementById('elabel').value.trim();
+  const cam=document.getElementById('ecam').value.trim();
+  const card=document.getElementById('ecard').value.trim().toUpperCase();
+  if(!label){ toast('Give the row a name'); return; }
+  closeSheet(); apply('saveEntry',{eid:eid||null,label,card,cam,shoot:CUR});
+}
+function delEntry(eid){ closeSheet(); apply('delEntry',{eid}); }
+
+/* --- new shoot day --- */
+function openShootSheet(){
+  const recent=[...new Set(BATCHES.map(b=>b.project).filter(Boolean))].slice(0,6);
+  document.getElementById('sheetIn').innerHTML=`
+    <h2 class="sid" style="margin:0">New shoot day</h2>
+    <p class="sst">One log per day of shooting. Cards checked out to this project drop in automatically.</p>
+    <div class="sfield"><label class="lbl" for="sproj">Project</label>
+      <input type="text" id="sproj" placeholder="ASG Bananas" autocomplete="off"></div>
+    ${recent.length?`<div class="chips">${recent.map(pj=>
+      `<button class="chip" onclick="document.getElementById('sproj').value='${esc(pj)}'">${esc(pj)}</button>`).join('')}</div>`:''}
+    <div class="sfield"><label class="lbl" for="sday">Which day</label>
+      <input type="text" id="sday" placeholder="Day 1" autocomplete="off"></div>
+    <div class="sfield"><label class="lbl" for="sdate">Shoot date</label>
+      <input type="date" id="sdate" value="${today()}"></div>
+    <div class="sact">
+      <button class="good" onclick="saveShoot()">Create shoot day</button>
+      ${CUR?`<button class="danger" onclick="delShoot('${CUR}')">Delete “${esc(SHOOTS[CUR].project)}”</button>`:''}
+      <button onclick="closeSheet()">Cancel</button></div>`;
+  sheet.showModal();
+  document.getElementById('sproj').focus();
+}
+function saveShoot(){
+  const project=document.getElementById('sproj').value.trim();
+  const day=document.getElementById('sday').value.trim();
+  const date=document.getElementById('sdate').value||today();
+  if(!project){ toast('Give it a project name'); return; }
+  closeSheet(); apply('newShoot',{project,day,date});
+}
+function delShoot(sid){ closeSheet(); CUR=null; apply('delShoot',{sid}); }
+
+/* ============================================================
    HISTORY
    ============================================================ */
 const ACT={
   took:{dot:'out'}, returned:{dot:'ok'}, partial:{dot:'gone'}, flagged:{dot:'gone'},
   found:{dot:'ok'}, added:{dot:'neutral'}, removed:{dot:'neutral'}, rail:{dot:'neutral'},
+  cam:{dot:'neutral'}, shoot:{dot:'neutral'},
 };
 
 function logSentence(e){
@@ -1145,6 +1489,8 @@ function logSentence(e){
     case 'added':    return `<b>${who}</b> added ${n} card${n>1?'s':''} to the wall`;
     case 'removed':  return `<b>${who}</b> removed ${esc((e.cards||[])[0]||'')} from the wall`;
     case 'rail':     return `<b>${who}</b> created a new rail`;
+    case 'cam':      return `<b>${who}</b> put ${esc((e.cards||[])[0]||'')} in ${esc(e.note||'a camera')}`;
+    case 'shoot':    return `<b>${who}</b> started a shoot day`;
     default:         return `<b>${who}</b> made a change`;
   }
 }

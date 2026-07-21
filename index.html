@@ -1356,59 +1356,116 @@ function shootStats(sid){
 }
 const recentProjects=()=>[...new Set(BATCHES.map(b=>b.project).filter(Boolean))].slice(0,8);
 
+/* Ingest → project → shoot day. PROJ null means we're at the top. */
+let PROJ=null;
+
+function projList(){
+  const m={};
+  Object.values(SHOOTS).forEach(sh=>{
+    const k=sh.project||'Untitled';
+    (m[k]=m[k]||{name:k,shoots:[],rows:0,verified:0,risk:0}).shoots.push(sh);
+  });
+  Object.values(m).forEach(p=>{
+    p.shoots.forEach(sh=>{ const st=shootStats(sh.id);
+      p.rows+=st.total; p.verified+=st.verified; p.risk+=st.risk; });
+    p.shoots.sort((x,y)=>(y.date||'').localeCompare(x.date||'')||(y.day||'').localeCompare(x.day||''));
+    p.newest=p.shoots[0]; p.oldest=p.shoots[p.shoots.length-1];
+  });
+  return Object.values(m).sort((x,y)=>y.risk-x.risk||(y.newest.date||'').localeCompare(x.newest.date||''));
+}
+const daysOf=name=>Object.values(SHOOTS).filter(sh=>sameProject(sh.project,name))
+  .sort((x,y)=>(y.date||'').localeCompare(x.date||'')||(y.day||'').localeCompare(x.day||''));
+
 function renderIngest(){
-  const list=shootList();
+  /* keep the three levels in step with each other */
   if(CUR&&CUR!=='ALL'&&!SHOOTS[CUR]) CUR=null;
-  if(!CUR) CUR = list.length>1 ? 'ALL' : (list.length?list[0].id:null);
+  if(CUR&&CUR!=='ALL') PROJ=SHOOTS[CUR].project;
+  if(PROJ&&!daysOf(PROJ).length){ PROJ=null; CUR=null; }
 
-  document.getElementById('shoots').innerHTML=
-    (list.length>1?`<button class="sh" aria-pressed="${CUR==='ALL'}" onclick="pickShoot('ALL')">
-      <span class="p">All shoots</span><span class="d">${list.length} running</span></button>`:'')
-    + list.map(sh=>{
-        const st=shootStats(sh.id);
-        return `<button class="sh" aria-pressed="${sh.id===CUR}" onclick="pickShoot('${sh.id}')">
-          <span class="p">${esc(sh.project)}</span>
-          <span class="d">${esc(sh.day||'')}${sh.day?' · ':''}${fmt(sh.date)}${st.risk?' · '+st.risk+' at risk':''}</span></button>`;
-      }).join('');
+  if(!PROJ) return renderProjects();
+  if(!CUR||CUR==='ALL') return renderDays();
+  return renderShoot();
+}
 
-  const el=document.getElementById('ingBody');
+/* ---------- level 1: projects ---------- */
+function renderProjects(){
+  const list=projList(), risk=list.reduce((n,p)=>n+p.risk,0);
+  document.getElementById('shoots').innerHTML='';
+  document.getElementById('ingTitle').textContent='Ingest';
+  document.getElementById('ingLede').textContent = list.length
+    ? list.length+' project'+(list.length===1?'':'s')+(risk?' · '+risk+' cards on a single copy':' · everything is backed up')
+    : 'Track every card from the camera to a verified backup.';
 
-  if(!list.length){
-    document.getElementById('ingTitle').textContent='Ingest';
-    document.getElementById('ingLede').textContent='Track every card from the camera to a verified backup.';
-    el.innerHTML=`<p class="empty"><b>No shoot days yet.</b>Start one and any cards already checked out to that project drop in automatically.</p>`;
-    return;
-  }
+  document.getElementById('ingBody').innerHTML = list.length
+    ? list.map(p=>{
+        const ok=p.rows&&p.verified===p.rows&&!p.risk;
+        const tone=p.risk?'p-risk':ok?'p-safe':'p-idle';
+        const span=p.shoots.length>1
+          ? fmt(p.oldest.date)+' – '+fmt(p.newest.date)
+          : fmt(p.newest.date);
+        return `<button class="pcard ${p.risk?'danger':''}" style="width:100%;text-align:left;font:inherit;color:inherit;cursor:pointer;padding:0"
+            onclick="openProject('${esc(p.name)}')">
+          <div class="phead"><span class="pn">${esc(p.name)}</span>
+            <span class="pm">${p.shoots.length} shoot day${p.shoots.length===1?'':'s'} · ${span}</span></div>
+          <div class="pstats">
+            <div><span>Rows</span><b>${p.rows}</b></div>
+            <div><span>Verified</span><b>${p.verified}</b></div>
+            <div class="${tone}" style="background:var(--pb)"><span style="color:var(--pc)">Single copy</span>
+              <b style="color:var(--pc)">${p.risk}</b></div>
+          </div>
+          <div class="pfoot ${tone}" style="color:var(--pc)">${
+            p.risk? p.risk+' card'+(p.risk===1?'':'s')+' exist in one place only'
+                  : ok? 'All verified. Safe to wipe and return.'
+                      : p.verified+' of '+p.rows+' verified'}</div>
+        </button>`;
+      }).join('')
+    : `<p class="empty"><b>No shoot days yet.</b>Start one and any cards already checked out to that project drop in automatically.</p>`;
+}
+function openProject(name){ PROJ=name; CUR=null; renderIngest(); window.scrollTo({top:0,behavior:'smooth'}); }
+function backToProjects(){ PROJ=null; CUR=null; renderIngest(); window.scrollTo({top:0,behavior:'smooth'}); }
 
-  if(CUR==='ALL'){
-    const risky=list.reduce((n,sh)=>n+shootStats(sh.id).risk,0);
-    document.getElementById('ingTitle').textContent='All shoots';
-    document.getElementById('ingLede').textContent=
-      list.length+' shoot days running'+(risky?' · '+risky+' cards on a single copy':' · everything is backed up');
-    el.innerHTML=list.map(sh=>{
-      const st=shootStats(sh.id), ok=st.total&&st.verified===st.total&&!st.risk;
-      const tone=st.risk?'p-risk':ok?'p-safe':'p-idle';
-      return `<div class="pcard ${st.risk?'danger':''}">
-        <div class="phead"><span class="pn">${esc(sh.project)}</span>
-          <span class="pm">${esc(sh.day||'')}${sh.day?' · ':''}${fmt(sh.date)}</span></div>
-        <div class="pstats">
-          <div><span>Rows</span><b>${st.total}</b></div>
-          <div><span>Verified</span><b>${st.verified}</b></div>
-          <div class="${tone}" style="background:var(--pb)"><span style="color:var(--pc)">Single copy</span>
-            <b style="color:var(--pc)">${st.risk}</b></div>
-        </div>
-        <div class="prow" style="padding-top:var(--sp-3)">
-          <button class="btn2" onclick="pickShoot('${sh.id}')">Open</button>
-          <button class="btn2 sec" onclick="openShootMenu('${sh.id}')">Edit</button>
-        </div></div>`;
-    }).join('');
-    return;
-  }
-
-  const sh=SHOOTS[CUR];
-  document.getElementById('ingTitle').textContent=sh.project;
+/* ---------- level 2: shoot days in one project ---------- */
+function renderDays(){
+  const days=daysOf(PROJ), risk=days.reduce((n,sh)=>n+shootStats(sh.id).risk,0);
+  document.getElementById('shoots').innerHTML='';
+  document.getElementById('ingTitle').textContent=PROJ;
   document.getElementById('ingLede').textContent=
-    (sh.day?sh.day+' · ':'')+new Date(sh.date+'T12:00').toLocaleDateString(undefined,{weekday:'long',month:'long',day:'numeric'});
+    days.length+' shoot day'+(days.length===1?'':'s')+(risk?' · '+risk+' cards on a single copy':' · everything is backed up');
+
+  document.getElementById('ingBody').innerHTML =
+    `<div class="prow" style="padding:0;margin-top:var(--sp-4)">
+       <button class="btn2" onclick="backToProjects()">← All projects</button></div>`
+    + days.map(sh=>{
+        const st=shootStats(sh.id), ok=st.total&&st.verified===st.total&&!st.risk;
+        const tone=st.risk?'p-risk':ok?'p-safe':'p-idle';
+        return `<div class="pcard ${st.risk?'danger':''}">
+          <div class="phead"><span class="pn">${esc(sh.day||'Shoot day')}</span>
+            <span class="pm">${fmt(sh.date)}</span></div>
+          <div class="pstats">
+            <div><span>Rows</span><b>${st.total}</b></div>
+            <div><span>Verified</span><b>${st.verified}</b></div>
+            <div class="${tone}" style="background:var(--pb)"><span style="color:var(--pc)">Single copy</span>
+              <b style="color:var(--pc)">${st.risk}</b></div>
+          </div>
+          <div class="prow" style="padding-top:var(--sp-3)">
+            <button class="btn2" onclick="pickShoot('${sh.id}')">Open</button>
+            <button class="btn2 sec" onclick="openShootMenu('${sh.id}')">Edit</button>
+          </div></div>`;
+      }).join('');
+}
+
+/* ---------- level 3: one shoot day ---------- */
+function renderShoot(){
+  const sh=SHOOTS[CUR], days=daysOf(sh.project);
+  document.getElementById('shoots').innerHTML = days.length>1
+    ? days.map(d=>`<button class="sh" aria-pressed="${d.id===CUR}" onclick="pickShoot('${d.id}')">
+        <span class="p">${esc(d.day||'Shoot day')}</span>
+        <span class="d">${fmt(d.date)}${shootStats(d.id).risk?' · '+shootStats(d.id).risk+' at risk':''}</span></button>`).join('')
+    : '';
+
+  document.getElementById('ingTitle').textContent=sh.day||sh.project;
+  document.getElementById('ingLede').textContent=
+    sh.project+' · '+new Date(sh.date+'T12:00').toLocaleDateString(undefined,{weekday:'long',month:'long',day:'numeric'});
 
   const rows=entriesFor(CUR), total=rows.length;
   const verified=rows.filter(e=>e.status==='VERIFIED').length;
@@ -1419,7 +1476,7 @@ function renderIngest(){
     if(risky.length) safety=`<div class="safety p-risk"><span class="big">${risky.length} ${risky.length===1?'card is':'cards are'} on a single copy</span>
       <span class="sub">Nothing here is safe to wipe yet — ${esc(risky.slice(0,4).map(e=>e.label).join(', '))}${risky.length>4?' and '+(risky.length-4)+' more':''}.</span></div>`;
     else if(verified===total) safety=`<div class="safety p-safe"><span class="big">All ${total} verified</span>
-      <span class="sub">Every card on this shoot is checksummed on two drives. Safe to wipe and put back on the wall.</span></div>`;
+      <span class="sub">Every card on this day is checksummed on two drives. Safe to wipe and put back on the wall.</span></div>`;
     else safety=`<div class="safety p-warm"><span class="big">${verified} of ${total} verified</span>
       <span class="sub">The rest are copied but not checksummed. Don't wipe anything until it reads Verified.</span></div>`;
   }
@@ -1437,16 +1494,16 @@ function renderIngest(){
     grouped[grouped.length-1].items.push(e); });
 
   const head=`<div class="prow" style="padding:0;margin-top:var(--sp-4)">
-    ${shootList().length>1?`<button class="btn2" onclick="pickShoot('ALL')">← All shoots</button>`:''}
+    <button class="btn2" onclick="backToDays()">← ${esc(sh.project)}</button>
     <button class="btn2 sec" onclick="openShootMenu('${CUR}')">Edit shoot day</button></div>`;
 
-  el.innerHTML=head+safety+bar+(total
+  document.getElementById('ingBody').innerHTML=head+safety+bar+(total
     ? grouped.map(g=>`<div class="grp"><div class="grph">${g.label} · ${g.items.length}</div>
         <div class="list">${g.items.map(ingRow).join('')}</div></div>`).join('')
     : `<p class="empty"><b>Nothing logged for this day yet.</b>Cards checked out to ${esc(sh.project)} land here on their own. Add a row by hand for lavs, drones, and anything not on the wall.</p>`)
-    + `<button class="addbtn" onclick="openEntrySheet()">+ Add a row</button>`
-    + `<p class="note">Cards checked out to ${esc(sh.project)} arrive here automatically.</p>`;
+    + `<button class="addbtn" onclick="openEntrySheet()">+ Add a row</button>`;
 }
+function backToDays(){ CUR=null; renderIngest(); window.scrollTo({top:0,behavior:'smooth'}); }
 function pickShoot(id){ CUR=id; renderIngest(); window.scrollTo({top:0,behavior:'smooth'}); }
 
 function ingRow(e){
@@ -1512,7 +1569,7 @@ function openShootSheet(){
     <h2 class="sid" style="margin:0">New shoot day</h2>
     <p class="sst">One log per day of shooting. Cards checked out to this project drop in automatically.</p>
     <div class="sfield"><label class="lbl" for="sproj">Project</label>
-      <input type="text" id="sproj" placeholder="ASG Bananas" autocomplete="off"></div>
+      <input type="text" id="sproj" placeholder="ASG Bananas" value="${esc(PROJ||'')}" autocomplete="off"></div>
     ${recent.length?`<div class="chips">${recent.map(pj=>
       `<button class="chip" onclick="document.getElementById('sproj').value='${esc(pj)}'">${esc(pj)}</button>`).join('')}</div>`:''}
     <div class="sfield"><label class="lbl" for="sday">Which day</label>
@@ -1565,7 +1622,7 @@ function saveShoot(){
   const day=document.getElementById('sday').value.trim();
   const date=document.getElementById('sdate').value||today();
   if(!project){ toast('Give it a project name'); return; }
-  closeSheet(); apply('newShoot',{project,day,date});
+  PROJ=project; closeSheet(); apply('newShoot',{project,day,date});
 }
 
 /* ============================================================

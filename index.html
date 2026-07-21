@@ -4,10 +4,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#f7f8f9">
-<title>Card Wall</title>
+<title>Card Wall — Dude Perfect</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <style>
 /* ============================================================
    TOKENS
@@ -78,6 +80,29 @@ h2{font-size:var(--t-md);font-weight:600;letter-spacing:-.15px;line-height:1.3;
 h2 .c{font-size:var(--t-sm);font-weight:400;color:var(--ink-3)}
 h2 .c.bad{color:var(--gone);font-weight:600}
 .lede{font-size:var(--t-base);color:var(--ink-2);margin:0;max-width:68ch;text-wrap:pretty}
+
+/* ---- sign-in gate ---- */
+#gate{min-height:100dvh;display:grid;place-items:center;padding:var(--sp-5) var(--sp-4)}
+body.authed #gate{display:none}
+#app{display:none} body.authed #app{display:block}
+.gcard{width:100%;max-width:380px;text-align:center}
+.gbrand{font-size:var(--t-sm);font-weight:600;color:var(--ink-3);letter-spacing:.2px}
+.gmark{font-size:var(--t-xl);font-weight:700;letter-spacing:-.4px;margin:var(--sp-1) 0 0}
+.gsub{font-size:var(--t-base);color:var(--ink-2);margin:var(--sp-3) 0 var(--sp-5);text-wrap:pretty}
+.gsub b{font-weight:600;color:var(--ink)}
+#signinBtn{width:100%;min-height:52px;background:var(--accent);color:#fff;border:1px solid var(--accent);
+  border-radius:var(--r);font:600 var(--t-md) inherit;letter-spacing:-.15px;cursor:pointer;
+  transition:background var(--dur) var(--ease)}
+@media (hover:hover){#signinBtn:hover{background:var(--accent-hover)}}
+#signinBtn:active{transform:translateY(1px)}
+#signinErr{display:none;margin-bottom:var(--sp-4);background:var(--gone-bg);border:1px solid var(--gone-line);
+  color:var(--gone);border-radius:var(--r);padding:var(--sp-3) var(--sp-4);font-size:var(--t-sm);
+  text-align:left;text-wrap:pretty}
+#signinMsg{margin-top:var(--sp-3);font-size:var(--t-sm);color:var(--ink-3)}
+#signoutBtn{min-height:32px;background:none;border:1px solid var(--line);color:var(--ink-3);
+  border-radius:var(--r-sm);padding:var(--sp-1) var(--sp-2);font:500 var(--t-xs) inherit;
+  cursor:pointer;transition:all var(--dur) var(--ease);white-space:nowrap}
+@media (hover:hover){#signoutBtn:hover{border-color:var(--line-strong);color:var(--ink)}}
 
 header{position:sticky;top:0;z-index:var(--z-sticky);background:color-mix(in oklab,var(--bg) 88%,transparent);
   backdrop-filter:blur(12px);border-bottom:1px solid var(--line);padding:var(--sp-3) var(--sp-4)}
@@ -284,9 +309,25 @@ dialog.sheet[open]::backdrop{animation:fade 240ms var(--ease)}
 </head>
 <body>
 
+<!-- ============ SIGN IN ============ -->
+<section id="gate">
+  <div class="gcard">
+    <div class="gbrand">Dude Perfect</div>
+    <h1 class="gmark">Card Wall</h1>
+    <p class="gsub">Crew access only. Sign in with your <b>@dudeperfect.com</b> Google account to see what's on the wall.</p>
+    <div id="signinErr"></div>
+    <button id="signinBtn" onclick="doSignIn()">Sign in with Google</button>
+    <div id="signinMsg"></div>
+  </div>
+</section>
+
+<!-- ============ APP ============ -->
+<div id="app">
+
 <header><div class="hrow">
   <span class="mark">Card Wall</span>
   <span class="who" id="who"></span>
+  <button id="signoutBtn" onclick="doSignOut()">Sign out</button>
 </div></header>
 
 <main class="wrap" id="main">
@@ -377,6 +418,8 @@ dialog.sheet[open]::backdrop{animation:fade 240ms var(--ease)}
 
 <div class="bar hide" id="bar"><div class="in" id="barIn"></div></div>
 
+</div><!-- /#app -->
+
 <dialog class="sheet" id="sheet"><div class="in" id="sheetIn"></div></dialog>
 
 <div class="toast" id="toast" role="status" aria-live="polite">
@@ -384,6 +427,60 @@ dialog.sheet[open]::backdrop{animation:fade 240ms var(--ease)}
 </div>
 
 <script>
+/* ============================================================
+   GOOGLE SIGN-IN — same Firebase project as the other DP tools,
+   so one login covers Briefs, Call Sheets and the Card Wall.
+   ============================================================ */
+const firebaseConfig = {
+  apiKey: "AIzaSyD08TW42hFXJMKTUnsE2I81FBVYfy_evWY",
+  authDomain: "dpcallsheets.firebaseapp.com",
+  databaseURL: "https://dpcallsheets-default-rtdb.firebaseio.com",
+  projectId: "dpcallsheets",
+  storageBucket: "dpcallsheets.firebasestorage.app",
+  messagingSenderId: "832234476895",
+  appId: "1:832234476895:web:8bda9695906476148f52ea"
+};
+const ALLOWED_DOMAIN='@dudeperfect.com';
+let _auth=null,_user=null;
+
+function _configured(){ return firebaseConfig.apiKey && !String(firebaseConfig.apiKey).includes('PASTE'); }
+function _emailOk(u){ return !!(u && u.email && u.email.toLowerCase().endsWith(ALLOWED_DOMAIN)); }
+
+function showGate(msg){
+  if(msg!=null){ const e=document.getElementById('signinErr');
+    e.textContent=msg; e.style.display=msg?'block':'none'; }
+  document.body.classList.remove('authed');
+}
+function showApp(){
+  document.body.classList.add('authed');
+  ME=(_user&&(_user.displayName||_user.email))||'\u2014';
+  document.getElementById('signoutBtn').textContent='Sign out ('+(_user&&_user.email?_user.email.split('@')[0]:'')+')';
+  document.getElementById('taker').value=ME;
+  go('home');
+}
+function doSignIn(){
+  if(!_auth) return;
+  const p=new firebase.auth.GoogleAuthProvider();
+  p.setCustomParameters({hd:'dudeperfect.com',prompt:'select_account'});
+  _auth.signInWithPopup(p).catch(function(e){
+    const c=e&&e.code||'';
+    if(c==='auth/popup-closed-by-user'||c==='auth/cancelled-popup-request') return;
+    if(c==='auth/popup-blocked'||c==='auth/operation-not-supported-in-this-environment'){ _auth.signInWithRedirect(p); }
+    else { showGate('Sign-in failed: '+(c||e.message)); }
+  });
+}
+function doSignOut(){ if(_auth) _auth.signOut(); }
+function gateInit(){
+  if(!_configured()){ document.getElementById('signinMsg').textContent='Not set up yet.'; showGate(); return; }
+  try{ firebase.initializeApp(firebaseConfig); _auth=firebase.auth(); }catch(e){ showGate(); return; }
+  _auth.onAuthStateChanged(function(user){
+    if(user && _emailOk(user)){ _user=user; showApp(); }
+    else if(user){ const bad=user.email; _auth.signOut();
+      showGate('\u201c'+bad+'\u201d isn\'t a '+ALLOWED_DOMAIN+' account.'); }
+    else { showGate(''); }
+  });
+}
+
 /* ============================================================
    INVENTORY
    ============================================================ */
@@ -404,7 +501,7 @@ const id=(g,i)=>g.key+'-'+(g.pad?String(i).padStart(g.pad,'0'):i);
    for a database; every read/write already funnels through
    the helpers below.
    ============================================================ */
-const ME='Blaise Larry-Cox';
+let ME='\u2014';
 const RECENT=['SAVBAN ASG','Bananas ASG','Overtime','Squad Games','Can We Score'];
 
 let CARDS={};
@@ -468,7 +565,7 @@ function go(v){
 function jump(e){document.getElementById(e).scrollIntoView({behavior:'smooth',block:'start'})}
 
 function render(){
-  document.getElementById('who').textContent=ME.split(' ')[0]+' · '+fmt(today());
+  document.getElementById('who').textContent=String(ME).split(' ')[0]+' · '+fmt(today());
   ({home:renderHome,take:renderTake,return:renderReturn,triage:renderTriage}[view]||(()=>{}))();
   renderBar();
 }
@@ -687,7 +784,6 @@ function undo(){
 }
 
 /* ---------- boot ---------- */
-document.getElementById('taker').value=ME;
 document.getElementById('dt').value=today();
 document.getElementById('pj').addEventListener('input',()=>{renderBar()});
 document.getElementById('pj').addEventListener('blur',renderTake);
@@ -695,7 +791,7 @@ document.getElementById('pj').addEventListener('blur',renderTake);
 (function seed(){
   [['SAVBAN ASG',{L:10,P:6}],['Overtime',{CF:3}]].forEach(([p,d])=>{
     draft=d; const a=assign(),cards=a.flatMap(x=>x.cards);
-    const b={id:seq++,project:p,taker:ME,date:today(),cards};
+    const b={id:seq++,project:p,taker:'Blaise Larry-Cox',date:today(),cards};
     cards.forEach(c=>CARDS[c].batch=b.id); BATCHES.unshift(b);
   });
   draft={};
@@ -704,7 +800,7 @@ document.getElementById('pj').addEventListener('blur',renderTake);
   });
 })();
 
-go('home');
+gateInit();
 </script>
 </body>
 </html>

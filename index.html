@@ -1395,7 +1395,7 @@ function renderIngest(){
 /* ---------- level 1: projects ---------- */
 function renderProjects(){
   const list=projList(), risk=list.reduce((n,p)=>n+p.risk,0);
-  document.getElementById('newShootBtn').style.display='';
+  const nb=document.getElementById('newShootBtn'); nb.style.display=''; nb.textContent='+ New project';
   document.getElementById('shoots').innerHTML='';
   document.getElementById('ingTitle').textContent='Ingest';
   document.getElementById('ingLede').textContent = list.length
@@ -1433,7 +1433,7 @@ function backToProjects(){ PROJ=null; CUR=null; renderIngest(); window.scrollTo(
 /* ---------- level 2: shoot days in one project ---------- */
 function renderDays(){
   const days=daysOf(PROJ), risk=days.reduce((n,sh)=>n+shootStats(sh.id).risk,0);
-  document.getElementById('newShootBtn').style.display='';
+  const nb=document.getElementById('newShootBtn'); nb.style.display=''; nb.textContent='+ New shoot day';
   document.getElementById('shoots').innerHTML='';
   document.getElementById('ingTitle').textContent=PROJ;
   document.getElementById('ingLede').textContent=
@@ -1574,8 +1574,8 @@ function delEntry(eid){ closeSheet(); apply('delEntry',{eid}); }
 function openShootSheet(){
   const recent=[...new Set(BATCHES.map(b=>b.project).filter(Boolean))].slice(0,6);
   document.getElementById('sheetIn').innerHTML=`
-    <h2 class="sid" style="margin:0">New shoot day</h2>
-    <p class="sst">One log per day of shooting. Cards checked out to this project drop in automatically.</p>
+    <h2 class="sid" style="margin:0">${PROJ?'New shoot day':'New project'}</h2>
+    <p class="sst">${PROJ?'Another day of shooting for '+esc(PROJ)+'. ':'Name the project and its first shoot day. '}Cards checked out to it drop in automatically.</p>
     <div class="sfield"><label class="lbl" for="sproj">Project</label>
       <input type="text" id="sproj" placeholder="ASG Bananas" value="${esc(PROJ||'')}" autocomplete="off"></div>
     ${recent.length?`<div class="chips">${recent.map(pj=>
